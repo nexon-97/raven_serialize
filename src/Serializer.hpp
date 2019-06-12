@@ -1,4 +1,5 @@
 #pragma once
+#include <typeindex>
 
 namespace raven
 {
@@ -15,10 +16,9 @@ public:
 	constexpr Serializer(Serializer&&) = default;
 	constexpr Serializer& operator=(Serializer&&) = default;
 
-	template <typename T>
-	constexpr void Write(const T& value)
+	constexpr void Write(const std::type_index& valueTypeIndex, void* value)
 	{
-		m_writer.Write(value);
+		m_writer.Write(valueTypeIndex, value);
 	}
 
 	constexpr const Writer& GetWriter() const { return m_writer; }
