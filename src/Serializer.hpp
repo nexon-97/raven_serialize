@@ -21,6 +21,12 @@ public:
 		m_writer.Write(valueTypeIndex, value);
 	}
 
+	template <typename T>
+	constexpr void Write(const T& value)
+	{
+		m_writer.Write(value);
+	}
+
 	constexpr const Writer& GetWriter() const { return m_writer; }
 	constexpr Writer& GetWriter() { return m_writer; }
 

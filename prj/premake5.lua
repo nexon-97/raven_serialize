@@ -19,6 +19,7 @@ EngineRootLocation = path.getabsolute("../")
 workspace "raven_serialize"
 	configurations { "Debug", "Release" }
 	platforms { "x64" }
+	cppdialect("c++17")
 
 solution "raven_serialize"
 	location ("../.")
