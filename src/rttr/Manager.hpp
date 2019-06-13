@@ -83,13 +83,12 @@ public:
 				metaTypeData.arrayRank = 1U;
 				metaTypeData.arrayTraits.isStdArray = true;
 				metaTypeData.underlyingType[0] = new Type(Reflect<std_vector_type<T>::type>());
-				//std::memcpy(metaTypeData.underlyingType[0], &underlyingType, sizeof(Type));
-				//metaTypeData.underlyingType[0] = &Reflect<std_vector_type<T>::type>();
 			}
 			else
 			{
 				metaTypeData.arrayRank = std::rank<T>::value;
 				metaTypeData.arrayTraits.isSimpleArray = true;
+				metaTypeData.underlyingType[0] = new Type(Reflect<std::remove_all_extents_t<T>>());
 			}
 
 			if (metaTypeData.isArray)

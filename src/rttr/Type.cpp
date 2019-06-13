@@ -138,6 +138,11 @@ const std::type_index& Type::GetTypeIndex() const
 	return m_typeData->typeIndex;
 }
 
+bool Type::IsDynamicArray() const
+{
+	return IsArray() && !m_typeData->arrayTraits.isSimpleArray;
+}
+
 void Type::AddProperty(std::shared_ptr<Property>&& property)
 {
 	auto predicate = [&property](const std::shared_ptr<Property>& item)
@@ -216,6 +221,16 @@ void Type::IterateArray(const void* value, const ArrayIteratorFunc& f) const
 		auto underlyingType = GetUnderlyingType();
 
 		for (std::size_t i = 0U; i < size; ++i)
+		{
+			f(underlyingType, i, dataPtr + underlyingType.GetSize() * i);
+		}
+	}
+	else if (m_typeData->arrayTraits.isSimpleArray)
+	{
+		auto dataPtr = static_cast<const uint8_t*>(value);
+		auto underlyingType = GetUnderlyingType();
+
+		for (std::size_t i = 0U; i < m_typeData->arrayExtents.get()[0]; ++i)
 		{
 			f(underlyingType, i, dataPtr + underlyingType.GetSize() * i);
 		}

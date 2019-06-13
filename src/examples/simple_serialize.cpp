@@ -75,22 +75,49 @@ public:
 			m_stream << '[' << std::endl;
 			++m_padding;
 
-			std::size_t arraySize = type.GetDynamicArraySize(&value);
-
-			auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
+			if (type.IsDynamicArray())
 			{
-				PrintPadding();
-				Write(itemType, itemPtr);
+				std::size_t arraySize = type.GetDynamicArraySize(&value);
 
-				if (index + 1U < arraySize)
+				auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
 				{
-					m_stream.put(',');
-					
-				}
+					PrintPadding();
+					Write(itemType, itemPtr);
 
-				m_stream << std::endl;
-			};
-			type.IterateArray(value, f);
+					if (index + 1U < arraySize)
+					{
+						m_stream.put(',');
+
+					}
+
+					m_stream << std::endl;
+				};
+
+				type.IterateArray(value, f);
+			}
+			else
+			{
+				for (std::size_t dim = 0U; dim < type.GetArrayRank(); ++dim)
+				{
+					std::size_t arraySize = type.GetArrayExtent(dim);
+
+					auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
+					{
+						PrintPadding();
+						Write(itemType, itemPtr);
+
+						if (index + 1U < arraySize)
+						{
+							m_stream.put(',');
+
+						}
+
+						m_stream << std::endl;
+					};
+
+					type.IterateArray(value, f);
+				}
+			}
 
 			--m_padding;
 			PrintPadding();
@@ -173,7 +200,7 @@ struct TestStruct
 	Quaternion rotation;
 	std::string timestamp;
 	std::vector<int> vec;
-	int somevec[5][3][7];
+	int somevec[15];
 
 	void SetA(const int value)
 	{
@@ -198,6 +225,8 @@ int main()
 	value.timestamp = "It's OK, dude!";
 	value.scale.someBoolVar = false;
 	value.vec = { 5, 7, 25, -15, 0 };
+	value.somevec[0] = 25;
+	value.somevec[6] = -92;
 
 	rttr::MetaType<Vector3>("Vector3")
 		.DeclProperty("x", &Vector3::x)
@@ -217,7 +246,8 @@ int main()
 		.DeclProperty("scale", &TestStruct::scale)
 		.DeclProperty("rotation", &TestStruct::rotation)
 		.DeclProperty("timestamp", &TestStruct::timestamp)
-		.DeclProperty("vec", &TestStruct::vec);
+		.DeclProperty("vec", &TestStruct::vec)
+		.DeclProperty("somevec", &TestStruct::somevec);
 
 	serializer.Write(value);
 

@@ -78,6 +78,7 @@ public:
 	using ArrayIteratorFunc = std::function<void(const Type&, std::size_t, const void*)>;
 	void IterateArray(const void* value, const ArrayIteratorFunc& f) const;
 	std::size_t GetDynamicArraySize(const void* value) const;
+	bool IsDynamicArray() const;
 
 	template <typename Signature>
 	Type& DeclProperty(const char* name, Signature signature)
