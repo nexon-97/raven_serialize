@@ -1,11 +1,11 @@
 #pragma once
 #include "rttr/Aliases.hpp"
 #include "rttr/helper/TypeTraitsExtension.hpp"
+#include "rttr/Type.hpp"
 #include <unordered_map>
 #include <string>
 #include <typeindex>
 #include <cassert>
-#include <any>
 
 namespace rttr
 {
@@ -83,42 +83,75 @@ struct ExtractValueType<MutatorMethodByValue<T, ValueType>>
 	typedef ValueType type;
 };
 
+template <typename SignatureType>
+struct ExtractClassType {};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<MemberSignature<T, ValueType>>
+{
+	typedef T type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<AccessorMethod<T, ValueType>>
+{
+	typedef T type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<AccessorMethodByValue<T, ValueType>>
+{
+	typedef T type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<MutatorMethod<T, ValueType>>
+{
+	typedef T type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<MutatorMethodByValue<T, ValueType>>
+{
+	typedef T type;
+};
+
 ///////////////////////////////////////////////////////////////////////////////////////
 
-
-
-///////////////////////////////////////////////////////////////////////////////////////
-
-class BaseProperty
+class Property
 {
 public:
-	BaseProperty(const std::string& name)
+	Property(const char* name, const Type& type)
 		: m_name(name)
+		, m_type(type)
 	{}
 
-	virtual std::type_index GetValueTypeIndex() const = 0;
-	virtual void* GetValue(void* object) = 0;
+	virtual void GetValue(const void* object, void*& storage, bool& needRelease) = 0;
 
-	virtual std::any GetValueSafe(const void* object) const = 0;
+	const Type& GetType() const
+	{
+		return m_type;
+	}
 
-	virtual bool IsIntegral() const = 0;
-	virtual bool IsArray() const = 0;
-	virtual std::size_t GetArraySize() const = 0;
-	virtual std::any GetArrayItem(void* object, const std::size_t idx) const = 0;
+	const char* GetName() const
+	{
+		return m_name;
+	}
 
 private:
-	std::string m_name;
+	const char* m_name = nullptr;
+	const Type m_type;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 template <typename ClassType, typename ValueType, typename SignatureType>
 class MemberProperty
-	: public BaseProperty
+	: public Property
 {
 public:
-	MemberProperty(const std::string& name, SignatureType signature)
-		: BaseProperty(name)
+	MemberProperty(const char* name, SignatureType signature)
+		: Property(name, rttr::Reflect<ValueType>())
 		, m_signature(signature)
 	{}
 
@@ -132,46 +165,12 @@ public:
 		return AccessBySignature(m_signature, object);
 	}
 
-	std::type_index GetValueTypeIndex() const final
+	void GetValue(const void* object, void*& i_storage, bool& needRelease) final
 	{
-		return typeid(ValueType);
-	}
-
-	void* GetValue(void* object) final
-	{
-		static ValueType context;
-		context = AccessBySignature(m_signature, static_cast<ClassType*>(object));
-
-		return &context;
-	}
-
-	bool IsIntegral() const final
-	{
-		return std::is_integral<ValueType>::value;
-	}
-
-	bool IsArray() const final
-	{
-		constexpr const bool k_isArray = std::is_array<ValueType>::value || is_std_vector<ValueType>::value || is_std_array<ValueType>::value;
-		return k_isArray;
-	}
-
-	std::size_t GetArraySize() const final
-	{
-		assert(IsArray());
-		return std::extent<ValueType>::value;
-	}
-
-	std::any GetArrayItem(void* object, const std::size_t idx) const final
-	{
-		assert(IsArray());
-		const ValueType& valueRef = AccessBySignature(m_signature, static_cast<ClassType*>(object));
-		return valueRef;
-	}
-
-	std::any GetValueSafe(const void* object) const final
-	{
-		return GetValue(static_cast<const ClassType*>(object));
+		// There is no need to allocate any additional memory, just cast the member pointer to void* and return
+		const void* valuePtr = &AccessBySignature(m_signature, static_cast<const ClassType*>(object));
+		i_storage = const_cast<void*>(valuePtr);
+		needRelease = false;
 	}
 
 private:
@@ -180,11 +179,11 @@ private:
 
 template <typename ClassType, typename ValueType, typename GetterSignature, typename SetterSignature>
 class IndirectProperty
-	: public BaseProperty
+	: public Property
 {
 public:
-	IndirectProperty(const std::string& name, GetterSignature getterSignature, SetterSignature setterSignature)
-		: BaseProperty(name)
+	IndirectProperty(const char* name, GetterSignature getterSignature, SetterSignature setterSignature)
+		: Property(name, rttr::Reflect<ValueType>())
 		, m_getterSignature(getterSignature)
 		, m_setterSignature(setterSignature)
 	{}
@@ -199,46 +198,11 @@ public:
 		return AccessBySignature(m_getterSignature, object);
 	}
 
-	std::type_index GetValueTypeIndex() const final
+	void GetValue(const void* object, void*& i_storage, bool& needRelease) final
 	{
-		return typeid(ValueType);
-	}
-
-	void* GetValue(void* object) final
-	{
-		static ValueType context;
-		context = AccessBySignature(m_getterSignature, static_cast<ClassType*>(object));
-
-		return &context;
-	}
-
-	bool IsIntegral() const final
-	{
-		return std::is_integral<ValueType>::value;
-	}
-
-	bool IsArray() const final
-	{
-		constexpr const bool k_isArray = std::is_array<ValueType>::value || is_std_vector<ValueType>::value || is_std_array<ValueType>::value;
-		return k_isArray;
-	}
-
-	std::size_t GetArraySize() const final
-	{
-		assert(IsArray());
-		return std::extent<ValueType>::value;
-	}
-
-	std::any GetArrayItem(void* object, const std::size_t idx) const final
-	{
-		assert(IsArray());
-		const ValueType& valueRef = AccessBySignature(m_getterSignature, static_cast<ClassType*>(object));
-		return valueRef;
-	}
-
-	std::any GetValueSafe(const void* object) const final
-	{
-		return GetValue(static_cast<const ClassType*>(object));
+		auto storage = new ValueType(AccessBySignature(m_getterSignature, static_cast<const ClassType*>(object)));
+		i_storage = storage;
+		needRelease = true;
 	}
 
 private:

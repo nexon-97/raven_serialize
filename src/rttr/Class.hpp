@@ -17,13 +17,13 @@ public:
 		: m_name(name)
 	{}
 
-	const std::unordered_map<std::string, std::unique_ptr<BaseProperty>>& GetProperties() const
+	const std::unordered_map<std::string, std::unique_ptr<Property>>& GetProperties() const
 	{
 		return m_properties;
 	}
 
 protected:
-	void AddProperty(const std::string& name, std::unique_ptr<BaseProperty>&& property)
+	void AddProperty(const std::string& name, std::unique_ptr<Property>&& property)
 	{
 		auto it = m_properties.find(name);
 		assert(it == m_properties.end());
@@ -33,7 +33,7 @@ protected:
 
 protected:
 	const std::string m_name;
-	std::unordered_map<std::string, std::unique_ptr<BaseProperty>> m_properties;
+	std::unordered_map<std::string, std::unique_ptr<Property>> m_properties;
 };
 
 template <typename T>
@@ -46,25 +46,25 @@ public:
 	{}
 
 	template <typename Signature>
-	Class& DeclProperty(const std::string& name, Signature signature)
+	Class& DeclProperty(const char* name, Signature signature)
 	{
-		auto property = std::make_unique<MemberProperty<T, typename ExtractValueType<Signature>::type, Signature>>(name, signature);
-		std::unique_ptr<BaseProperty> baseProperty(std::move(property));
+		//auto property = std::make_unique<MemberProperty<T, typename ExtractValueType<Signature>::type, Signature>>(name, signature);
+		//std::unique_ptr<Property> baseProperty(std::move(property));
 
-		AddProperty(name, std::move(baseProperty));
+		//AddProperty(name, std::move(baseProperty));
 
 		return *this;
 	}
 
 	template <typename GetterSignature, typename SetterSignature>
-	Class& DeclProperty(const std::string& name, GetterSignature getter, SetterSignature setter)
+	Class& DeclProperty(const char* name, GetterSignature getter, SetterSignature setter)
 	{
-		static_assert(std::is_same<ExtractValueType<GetterSignature>::type, ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
+		//static_assert(std::is_same<ExtractValueType<GetterSignature>::type, ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
 
-		auto property = std::make_unique<IndirectProperty<T, typename ExtractValueType<GetterSignature>::type, GetterSignature, SetterSignature>>(name, getter, setter);
-		std::unique_ptr<BaseProperty> baseProperty(std::move(property));
+		//auto property = std::make_unique<IndirectProperty<T, typename ExtractValueType<GetterSignature>::type, GetterSignature, SetterSignature>>(name, getter, setter);
+		//std::unique_ptr<Property> baseProperty(std::move(property));
 
-		AddProperty(name, std::move(baseProperty));
+		//AddProperty(name, std::move(baseProperty));
 
 		return *this;
 	}

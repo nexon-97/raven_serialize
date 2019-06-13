@@ -7,8 +7,9 @@
 #include <type_traits>
 #include <fstream>
 
-const std::string k_true = "true";
-const std::string k_false = "false";
+const char* k_true = "true";
+const char* k_false = "false";
+const char* k_null = "null";
 
 struct TestStruct;
 
@@ -17,92 +18,108 @@ class JsonWriter
 public:
 	explicit JsonWriter(std::ostream& stream)
 		: m_stream(stream)
-		, k_primitiveWriters{
-			{ typeid(int), &JsonWriter::WriteInt },
-			{ typeid(int8_t), &JsonWriter::WriteInt },
-			{ typeid(int16_t), &JsonWriter::WriteInt },
-			{ typeid(int32_t), &JsonWriter::WriteInt },
-			{ typeid(int64_t), &JsonWriter::WriteInt },
-			{ typeid(unsigned int), &JsonWriter::WriteInt },
-			{ typeid(uint8_t), &JsonWriter::WriteInt },
-			{ typeid(uint16_t), &JsonWriter::WriteInt },
-			{ typeid(uint32_t), &JsonWriter::WriteInt },
-			{ typeid(uint64_t), &JsonWriter::WriteInt },
-			{ typeid(float), &JsonWriter::WriteFloat },
-			{ typeid(double), &JsonWriter::WriteDouble },
-			{ typeid(bool), &JsonWriter::WriteBool },
-			{ typeid(std::string), &JsonWriter::WriteString },
-		}
 	{}
 
-	void WriteInt(void* value)
-	{
-		m_stream << *static_cast<int*>(value);
-	}
-
-	void WriteFloat(void* value)
-	{
-		m_stream << *static_cast<float*>(value);
-	}
-
-	void WriteDouble(void* value)
-	{
-		m_stream << *static_cast<double*>(value);
-	}
-
-	void WriteBool(void* value)
-	{
-		bool boolValue = *static_cast<bool*>(value);
-		m_stream << (boolValue ? k_true : k_false);
-	}
-
-	void WriteString(void* value)
-	{
-		m_stream << '"' << *static_cast<std::string*>(value) << '"';
-	}
-
 	template <typename T>
-	constexpr void Write(const T& value)
+	void Write(const T& value)
 	{
-		rttr::ClassBase* metaclass = rttr::Manager::GetRTTRManager().GetClass<T>();
-		if (nullptr != metaclass)
+		Write(rttr::Reflect<T>(), &value);
+	}
+
+	void Write(const rttr::Type& type, const void* value)
+	{
+		if (nullptr == value)
+		{
+			m_stream << k_null;
+		}
+		else if (type.GetTypeIndex() == typeid(bool))
+		{
+			bool boolValue = *static_cast<const bool*>(value);
+			m_stream << (boolValue ? k_true : k_false);
+		}
+		else if (type.IsString())
+		{
+			m_stream << '"';
+
+			if (type.GetTypeIndex() == typeid(std::string))
+			{
+				m_stream << *static_cast<const std::string*>(value);
+			}
+			else if (type.GetTypeIndex() == typeid(const char*))
+			{
+				m_stream << *static_cast<const char*>(value);
+			}
+
+			m_stream << '"';
+		}
+		else if (type.IsIntegral())
+		{
+			if (type.IsSigned())
+			{
+				int64_t intValue = type.CastToSignedInteger(value);
+				m_stream << intValue;
+			}
+			else
+			{
+				uint64_t intValue = type.CastToUnsignedInteger(value);
+				m_stream << intValue;
+			}
+		}
+		else if (type.IsFloatingPoint())
+		{
+			double floatValue = type.CastToFloat(value);
+			m_stream << floatValue;
+		}
+		else if (type.IsArray())
+		{
+			m_stream << '[' << std::endl;
+			++m_padding;
+
+			std::size_t arraySize = type.GetDynamicArraySize(&value);
+
+			auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
+			{
+				PrintPadding();
+				Write(itemType, itemPtr);
+
+				if (index + 1U < arraySize)
+				{
+					m_stream.put(',');
+					
+				}
+
+				m_stream << std::endl;
+			};
+			type.IterateArray(value, f);
+
+			--m_padding;
+			PrintPadding();
+			m_stream << ']';
+		}
+		else if (type.IsClass())
 		{
 			m_stream << '{' << std::endl;
+			++m_padding;
 
-			const std::size_t propertiesCount = metaclass->GetProperties().size();
-			std::size_t i = 0U;
-
-			for (const auto& propertyData : metaclass->GetProperties())
+			std::size_t propertiesCount = type.GetPropertiesCount();
+			for (std::size_t i = 0U; i < propertiesCount; ++i)
 			{
-				for (int pad = 0; pad < m_padding; ++pad)
+				auto property = type.GetProperty(i);
+				const rttr::Type& propertyType = property->GetType();
+
+				PrintPadding();
+				m_stream << '"' << property->GetName() << "\" : ";
+
+				void* valuePtr = nullptr;
+				bool needRelease = false;
+				property->GetValue(value, valuePtr, needRelease);
+				
+				Write(propertyType, valuePtr);
+
+				if (needRelease)
 				{
-					m_stream.put('\t');
+					delete valuePtr;
 				}
-
-				m_stream << '"' << propertyData.first << "\" : ";
-
-				auto concreteProperty = propertyData.second.get();
-
-				if (concreteProperty->IsArray())
-				{
-					m_stream << '[';
-					m_stream << ']';
-				}
-				else if (concreteProperty->IsIntegral())
-				{
-					/*std::any propValue = concreteProperty->GetValueSafe(&value);
-					int intValue = std::any_cast<int>(propValue);
-					m_stream << intValue;*/
-				}
-				else
-				{
-					/*std::any propValue = concreteProperty->GetValueSafe(&value);
-					Write(propValue.type(), &propValue);
-
-					m_stream << "null";*/
-				}
-
-				//void* propertyValuePtr = concreteProperty->GetValue(value);
 
 				if (i + 1U < propertiesCount)
 				{
@@ -110,80 +127,25 @@ public:
 				}
 
 				m_stream << std::endl;
-				++i;
 			}
-			--m_padding;
 
+			--m_padding;
+			PrintPadding();
 			m_stream << '}';
 		}
 	}
 
-	void Write(const std::type_index& valueTypeIndex, void* value)
+private:
+	void PrintPadding()
 	{
-		rttr::ClassBase* metaclass = rttr::Manager::GetRTTRManager().GetClass(valueTypeIndex);
-
-		if (nullptr == metaclass)
-		{
-			auto it = k_primitiveWriters.find(valueTypeIndex);
-			if (it != k_primitiveWriters.end())
-			{
-				std::invoke(it->second, this, value);
-			}
-			else
-			{
-				m_stream << "null";
-			}
-			
-			return;
-		}
-
-		m_stream << '{' << std::endl;
-		++m_padding;
-
-		const std::size_t propertiesCount = metaclass->GetProperties().size();
-		std::size_t i = 0U;
-		for (const auto& propertyData : metaclass->GetProperties())
-		{
-			for (int pad = 0; pad < m_padding; ++pad)
-			{
-				m_stream.put('\t');
-			}
-
-			m_stream << '"' << propertyData.first << "\" : ";
-
-			auto concreteProperty = propertyData.second.get();
-
-			if (concreteProperty->IsArray())
-			{
-				m_stream << '[' << std::endl;
-				m_stream << ']';
-			}
-
-			void* propertyValuePtr = concreteProperty->GetValue(value);
-
-			Write(concreteProperty->GetValueTypeIndex(), propertyValuePtr);
-
-			if (i + 1U < propertiesCount)
-			{
-				m_stream.put(',');
-			}
-
-			m_stream << std::endl;
-			++i;
-		}
-
-		--m_padding;
-
 		for (int pad = 0; pad < m_padding; ++pad)
 		{
 			m_stream.put('\t');
 		}
-		m_stream << '}';
 	}
 
 private:
 	std::ostream& m_stream;
-	const std::unordered_map<std::type_index, void(JsonWriter::*)(void*)> k_primitiveWriters;
 	int m_padding = 0;
 };
 
@@ -211,6 +173,7 @@ struct TestStruct
 	Quaternion rotation;
 	std::string timestamp;
 	std::vector<int> vec;
+	int somevec[5][3][7];
 
 	void SetA(const int value)
 	{
@@ -233,8 +196,22 @@ int main()
 	value.position = { 5.f, 15.f, 0.5f };
 	value.scale = { 1.f, 1.f, 1.f };
 	value.timestamp = "It's OK, dude!";
+	value.scale.someBoolVar = false;
+	value.vec = { 5, 7, 25, -15, 0 };
 
-	rttr::DeclClass<TestStruct>("TestStruct")
+	rttr::MetaType<Vector3>("Vector3")
+		.DeclProperty("x", &Vector3::x)
+		.DeclProperty("y", &Vector3::y)
+		.DeclProperty("z", &Vector3::z)
+		.DeclProperty("someBoolVar", &Vector3::someBoolVar);
+
+	rttr::MetaType<Quaternion>("Quaternion")
+		.DeclProperty("x", &Quaternion::x)
+		.DeclProperty("y", &Quaternion::y)
+		.DeclProperty("z", &Quaternion::z)
+		.DeclProperty("w", &Quaternion::w);
+
+	rttr::MetaType<TestStruct>("TestStruct")
 		.DeclProperty("a", &TestStruct::GetA, &TestStruct::SetA)
 		.DeclProperty("position", &TestStruct::position)
 		.DeclProperty("scale", &TestStruct::scale)
@@ -242,19 +219,6 @@ int main()
 		.DeclProperty("timestamp", &TestStruct::timestamp)
 		.DeclProperty("vec", &TestStruct::vec);
 
-	rttr::DeclClass<Vector3>("Vector3")
-		.DeclProperty("x", &Vector3::x)
-		.DeclProperty("y", &Vector3::y)
-		.DeclProperty("z", &Vector3::z)
-		.DeclProperty("someBoolVar", &Vector3::someBoolVar);
-
-	rttr::DeclClass<Quaternion>("Quaternion")
-		.DeclProperty("x", &Quaternion::x)
-		.DeclProperty("y", &Quaternion::y)
-		.DeclProperty("z", &Quaternion::z)
-		.DeclProperty("w", &Quaternion::w);
-
-	//serializer.Write(typeid(TestStruct), &value);
 	serializer.Write(value);
 
 	return 0;

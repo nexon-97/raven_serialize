@@ -16,11 +16,6 @@ public:
 	constexpr Serializer(Serializer&&) = default;
 	constexpr Serializer& operator=(Serializer&&) = default;
 
-	constexpr void Write(const std::type_index& valueTypeIndex, void* value)
-	{
-		m_writer.Write(valueTypeIndex, value);
-	}
-
 	template <typename T>
 	constexpr void Write(const T& value)
 	{
