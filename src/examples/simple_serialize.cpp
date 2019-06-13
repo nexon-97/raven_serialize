@@ -1,4 +1,6 @@
 #include "Serializer.hpp"
+#include "Deserializer.hpp"
+
 #include "rttr/Property.hpp"
 #include "rttr/Class.hpp"
 #include "rttr/Manager.hpp"
@@ -6,6 +8,8 @@
 #include <iostream>
 #include <type_traits>
 #include <fstream>
+
+#include <json/json.h>
 
 const char* k_true = "true";
 const char* k_false = "false";
@@ -77,7 +81,7 @@ public:
 
 			if (type.IsDynamicArray())
 			{
-				std::size_t arraySize = type.GetDynamicArraySize(&value);
+				std::size_t arraySize = type.GetDynamicArraySize(value);
 
 				auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
 				{
@@ -176,6 +180,170 @@ private:
 	int m_padding = 0;
 };
 
+////////////////////////////////////////////////////////////////////////
+
+class JsonReader
+{
+public:
+	explicit JsonReader(std::istream& stream)
+		: m_stream(stream)
+	{
+		m_stream.seekg(0, std::ios::end);
+		std::size_t bufferSize = static_cast<std::size_t>(m_stream.tellg());
+		m_stream.seekg(0, std::ios::beg);
+		std::streamoff offset = 0U;
+
+		char* buffer = new char[bufferSize];
+		m_stream.read(buffer, bufferSize);
+
+		Json::CharReaderBuilder builder;
+		auto reader = builder.newCharReader();
+		std::string errorStr;
+
+		if (reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr))
+		{
+			int a = 0;
+		}
+
+		delete[] buffer;
+	}
+
+	template <typename T>
+	void Read(T& value)
+	{
+		Read(rttr::Reflect<T>(), &value, m_jsonRoot);
+	}
+
+	void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+	{
+		if (type.GetTypeIndex() == typeid(bool))
+		{
+			*static_cast<bool*>(value) = jsonVal.asBool();
+		}
+		else if (type.IsString())
+		{
+			auto strValue = jsonVal.asCString();
+
+			if (type.GetTypeIndex() == typeid(std::string))
+			{
+				*static_cast<std::string*>(value) = strValue;
+			}
+			else if (type.GetTypeIndex() == typeid(const char*))
+			{
+				//*const_cast<char*>(static_cast<const char*>(value)) = const_cast<char*>(strValue);
+			}
+		}
+		else if (type.IsIntegral())
+		{
+			if (type.IsSigned())
+			{
+				int64_t intValue = jsonVal.asInt64();
+				
+				switch (type.GetSize())
+				{
+					case 1:
+						*static_cast<int8_t*>(value) = static_cast<int8_t>(intValue);
+						break;
+					case 2:
+						*static_cast<int16_t*>(value) = static_cast<int16_t>(intValue);
+						break;
+					case 4:
+						*static_cast<int32_t*>(value) = static_cast<int32_t>(intValue);
+						break;
+					case 8:
+					default:
+						*static_cast<int64_t*>(value) = intValue;
+						break;
+				}
+			}
+			else
+			{
+				uint64_t intValue = jsonVal.asUInt64();
+
+				switch (type.GetSize())
+				{
+					case 1:
+						*static_cast<uint8_t*>(value) = static_cast<uint8_t>(intValue);
+						break;
+					case 2:
+						*static_cast<uint16_t*>(value) = static_cast<uint16_t>(intValue);
+						break;
+					case 4:
+						*static_cast<uint32_t*>(value) = static_cast<uint32_t>(intValue);
+						break;
+					case 8:
+					default:
+						*static_cast<uint64_t*>(value) = intValue;
+						break;
+				}
+			}
+		}
+		else if (type.IsFloatingPoint())
+		{
+			double floatValue = jsonVal.asDouble();
+
+			if (type.GetTypeIndex() == typeid(float))
+			{
+				*static_cast<float*>(value) = static_cast<float>(floatValue);
+			}
+			else
+			{
+				*static_cast<double*>(value) = floatValue;
+			}
+		}
+		else if (type.IsArray())
+		{
+			// Resize dynamic array
+			if (type.IsDynamicArray())
+			{
+				std::size_t count = jsonVal.size();
+				type.SetDynamicArraySize(value, count);
+			}
+
+			auto itemType = type.GetUnderlyingType();
+
+			std::size_t i = 0U;
+			for (const auto& jsonItem : jsonVal)
+			{
+				void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
+
+				Read(itemType, itemValuePtr, jsonItem);
+
+				++i;
+			}
+		}
+		else if (type.IsClass())
+		{
+			std::size_t propertiesCount = type.GetPropertiesCount();
+			for (std::size_t i = 0U; i < propertiesCount; ++i)
+			{
+				auto property = type.GetProperty(i);
+				const rttr::Type& propertyType = property->GetType();
+
+				const auto& itemJsonVal = jsonVal[property->GetName()];
+
+				void* valuePtr = nullptr;
+				bool needRelease = false;
+				property->GetMutatorContext(value, valuePtr, needRelease);
+
+				Read(propertyType, valuePtr, itemJsonVal);
+				property->CallMutator(value, valuePtr);
+
+				if (needRelease)
+				{
+					delete valuePtr;
+				}
+			}
+		}
+	}
+
+private:
+	std::istream& m_stream;
+	Json::Value m_jsonRoot;
+};
+
+////////////////////////////////////////////////////////////////////////
+
 struct Vector3
 {
 	float x = 0.f;
@@ -213,9 +381,11 @@ struct TestStruct
 	}
 };
 
+////////////////////////////////////////////////////////////////////////
+
 int main()
 {
-	std::ofstream stream("test.json");
+	/*std::ofstream stream("test.json");
 	raven::Serializer<JsonWriter> serializer(stream);
 
 	TestStruct value;
@@ -226,7 +396,7 @@ int main()
 	value.scale.someBoolVar = false;
 	value.vec = { 5, 7, 25, -15, 0 };
 	value.somevec[0] = 25;
-	value.somevec[6] = -92;
+	value.somevec[6] = -92;*/
 
 	rttr::MetaType<Vector3>("Vector3")
 		.DeclProperty("x", &Vector3::x)
@@ -247,9 +417,18 @@ int main()
 		.DeclProperty("rotation", &TestStruct::rotation)
 		.DeclProperty("timestamp", &TestStruct::timestamp)
 		.DeclProperty("vec", &TestStruct::vec)
-		.DeclProperty("somevec", &TestStruct::somevec);
+		//.DeclProperty("somevec", &TestStruct::somevec)
+		;
 
-	serializer.Write(value);
+	/*serializer.Write(value);
+	stream.flush();
+	stream.close();*/
+
+	std::ifstream istream("test.json");
+	raven::Deserializer<JsonReader> deserializer(istream);
+
+	TestStruct readValue;
+	deserializer.Read(readValue);
 
 	return 0;
 }

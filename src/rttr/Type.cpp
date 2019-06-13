@@ -257,4 +257,29 @@ std::size_t Type::GetDynamicArraySize(const void* value) const
 	return 0U;
 }
 
+void Type::SetDynamicArraySize(void* value, const std::size_t count) const
+{
+	assert(IsArray());
+
+	if (m_typeData->arrayTraits.isStdArray)
+	{
+		auto vectorPtr = static_cast<std::vector<float>*>(value);
+		vectorPtr->resize(count);
+	}
+}
+
+void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
+{
+	assert(IsArray());
+
+	if (m_typeData->arrayTraits.isStdArray)
+	{
+		auto vectorPtr = static_cast<std::vector<float>*>(value);
+		auto underlyingType = GetUnderlyingType();
+		return reinterpret_cast<uint8_t*>(vectorPtr->data()) + underlyingType.GetSize() * idx;
+	}
+
+	return nullptr;
+}
+
 } // namespace rttr

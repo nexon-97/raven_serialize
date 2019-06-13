@@ -22,6 +22,19 @@ void ApplySignature(MemberSignature<T, ValueType> signature, T* object, const Va
 	object->*signature = value;
 }
 
+//MutatorMethod<T, ValueType>
+template <typename T, typename ValueType>
+void ApplySignature(MutatorMethod<T, ValueType> signature, T* object, const ValueType& value)
+{
+	std::invoke(signature, object, value);
+}
+
+template <typename T, typename ValueType>
+void ApplySignature(MutatorMethodByValue<T, ValueType> signature, T* object, const ValueType& value)
+{
+	std::invoke(signature, object, value);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////
 
 template <typename SignatureType, typename T, typename ValueType>
@@ -127,6 +140,8 @@ public:
 	{}
 
 	virtual void GetValue(const void* object, void*& storage, bool& needRelease) = 0;
+	virtual void GetMutatorContext(const void* object, void*& storage, bool& needRelease) = 0;
+	virtual void CallMutator(void* object, void* value) = 0;
 
 	const Type& GetType() const
 	{
@@ -155,9 +170,9 @@ public:
 		, m_signature(signature)
 	{}
 
-	void SetValue(ClassType* object, const ValueType& value)
+	void SetValue(ClassType* object, ValueType* value)
 	{
-		ApplySignature(m_signature, object, value);
+		ApplySignature(m_signature, object, *value);
 	}
 
 	const ValueType& GetValue(const ClassType* object) const
@@ -171,6 +186,18 @@ public:
 		const void* valuePtr = &AccessBySignature(m_signature, static_cast<const ClassType*>(object));
 		i_storage = const_cast<void*>(valuePtr);
 		needRelease = false;
+	}
+
+	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) final
+	{
+		const void* valuePtr = &AccessBySignature(m_signature, static_cast<const ClassType*>(object));
+		i_storage = const_cast<void*>(valuePtr);
+		needRelease = false;
+	}
+
+	void CallMutator(void* object, void* value) final
+	{
+		SetValue(static_cast<ClassType*>(object), static_cast<ValueType*>(value));
 	}
 
 private:
@@ -188,9 +215,9 @@ public:
 		, m_setterSignature(setterSignature)
 	{}
 
-	void SetValue(ClassType* object, const ValueType& value)
+	void SetValue(ClassType* object, ValueType* value)
 	{
-		ApplySignature(m_setterSignature, object, value);
+		ApplySignature(m_setterSignature, object, *value);
 	}
 
 	const ValueType& GetValue(const ClassType* object) const
@@ -203,6 +230,18 @@ public:
 		auto storage = new ValueType(AccessBySignature(m_getterSignature, static_cast<const ClassType*>(object)));
 		i_storage = storage;
 		needRelease = true;
+	}
+
+	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) final
+	{
+		auto storage = new ValueType();
+		i_storage = storage;
+		needRelease = true;
+	}
+
+	void CallMutator(void* object, void* value) final
+	{
+		SetValue(static_cast<ClassType*>(object), static_cast<ValueType*>(value));
 	}
 
 private:
