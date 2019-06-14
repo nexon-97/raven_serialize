@@ -1,5 +1,10 @@
 project "raven_serialize"
-	kind "ConsoleApp"
+	if SerializationStandalone then
+		kind "ConsoleApp"
+	else
+		kind "SharedLib"
+		defines { "RAVEN_SERIALIZE_EXPORTS" }
+	end
 	language "C++"
 	location(_ACTION)
 
@@ -8,6 +13,12 @@ project "raven_serialize"
 	{
 		"../src",
 	}
+	
+	if not SerializationStandalone then
+		excludes { "../src/examples/**", "../src/jsoncpp/**" }
+		links { "jsoncpp" }
+		includedirs { EngineRootLocation.."/framework/core/jsoncpp/include", }
+	end
 
 	targetdir(EngineRootLocation.."/bin")
 	targetname "raven_serialize"

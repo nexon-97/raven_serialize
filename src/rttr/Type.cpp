@@ -282,4 +282,9 @@ void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
 	return nullptr;
 }
 
+void* Type::Instantiate() const
+{
+	return std::invoke(m_typeData->instanceAllocator);
+}
+
 } // namespace rttr

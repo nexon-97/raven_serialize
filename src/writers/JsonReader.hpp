@@ -7,7 +7,7 @@
 class JsonReader
 {
 public:
-	explicit JsonReader(std::istream& stream);
+	explicit RAVEN_SER_API JsonReader(std::istream& stream);
 
 	template <typename T>
 	void Read(T& value)
@@ -15,7 +15,7 @@ public:
 		Read(rttr::Reflect<T>(), &value, m_jsonRoot);
 	}
 
-	void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal);
+	void RAVEN_SER_API Read(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
 private:
 	std::istream& m_stream;

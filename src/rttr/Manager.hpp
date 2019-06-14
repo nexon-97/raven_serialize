@@ -1,5 +1,6 @@
 #pragma once
 #include "rttr/Type.hpp"
+#include "raven_serialize.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -9,16 +10,9 @@
 namespace rttr
 {
 
-template <std::size_t I, std::size_t Extent>
-void AssingArrayExtent(std::size_t* arrayExtents)
-{
-	arrayExtents[I] = Extent;
-}
-
 template <typename T, std::size_t ...Is>
 void FillArrayExtentImpl(std::size_t* arrayExtents, std::index_sequence<Is...>)
 {
-	//(AssingArrayExtent<std::integral_constant<std::size_t, Is>{}, std::extent<T, Is>::value>(arrayExtents), ...);
 	((arrayExtents[std::integral_constant<std::size_t, Is>{}] = std::extent<T, Is>::value), ...);
 }
 
@@ -28,6 +22,12 @@ void FillArrayExtent(std::size_t* arrayExtents)
 	FillArrayExtentImpl<T>(arrayExtents, std::make_index_sequence<std::rank<T>::value>());
 }
 
+template <typename T>
+auto DefaultInstanceAllocator = []() -> void*
+{
+	return reinterpret_cast<void*>(new T());
+};
+
 class Manager
 {
 public:
@@ -35,7 +35,7 @@ public:
 	~Manager() = default;
 
 	template <typename T>
-	Type RegisterMetaType(const char* name = nullptr)
+	Type RegisterMetaType(const char* name = nullptr, const MetaTypeInstanceAllocator& instanceAllocator = DefaultInstanceAllocator<T>)
 	{
 		auto it = m_types.find(typeid(T));
 		if (it == m_types.end())
@@ -59,6 +59,7 @@ public:
 			metaTypeData.isConst = std::is_const<T>::value;
 			metaTypeData.isSigned = std::is_signed<T>::value;
 			metaTypeData.isString = is_string<T>::value;
+			metaTypeData.instanceAllocator = instanceAllocator;
 
 			if (is_std_vector<T>::value)
 			{
@@ -89,11 +90,7 @@ public:
 		}
 	}
 
-	static Manager& GetRTTRManager()
-	{
-		static Manager s_manager;
-		return s_manager;
-	}
+	static RAVEN_SER_API Manager& GetRTTRManager();
 
 private:
 	std::unordered_map<std::type_index, type_data> m_types;
@@ -103,12 +100,14 @@ private:
 template <typename T>
 Type MetaType(const char* name)
 {
+	static_assert(std::is_default_constructible<T>::value, "Metatypes must be default constructible!");
 	return Manager::GetRTTRManager().RegisterMetaType<T>(name);
 }
 
 template <typename T>
 Type Reflect()
 {
+	static_assert(std::is_default_constructible<T>::value, "Metatypes must be default constructible!");
 	return Manager::GetRTTRManager().RegisterMetaType<T>();
 }
 
