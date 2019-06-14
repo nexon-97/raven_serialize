@@ -25,7 +25,42 @@ void FillArrayExtent(std::size_t* arrayExtents)
 template <typename T>
 auto DefaultInstanceAllocator = []() -> void*
 {
+	static_assert(std::is_default_constructible<T>::value, "Metatype must be default constructible!");
 	return reinterpret_cast<void*>(new T());
+};
+
+template <typename T, typename Cond = void>
+struct ArrayDataResolver
+{
+	ArrayDataResolver(type_data& metaTypeData) {}
+};
+
+template <typename T>
+struct ArrayDataResolver<T, std::enable_if<is_std_vector<T>::value>>
+{
+	ArrayDataResolver(type_data& metaTypeData)
+	{
+		metaTypeData.arrayRank = 1U;
+		metaTypeData.arrayTraits.isStdArray = true;
+		metaTypeData.underlyingType[0] = new Type(Reflect<std_vector_type<T>::type>());
+
+		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
+		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
+	}
+};
+
+template <typename T>
+struct ArrayDataResolver<T, std::enable_if<std::is_array<T>::value, T>>
+{
+	ArrayDataResolver(type_data& metaTypeData)
+	{
+		metaTypeData.arrayRank = std::rank<T>::value;
+		metaTypeData.arrayTraits.isSimpleArray = true;
+		metaTypeData.underlyingType[0] = new Type(Reflect<std::remove_all_extents_t<T>>());
+
+		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
+		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
+	}
 };
 
 class Manager
@@ -35,7 +70,7 @@ public:
 	~Manager() = default;
 
 	template <typename T>
-	Type RegisterMetaType(const char* name = nullptr, const MetaTypeInstanceAllocator& instanceAllocator = DefaultInstanceAllocator<T>)
+	Type RegisterMetaType(const char* name, const MetaTypeInstanceAllocator& instanceAllocator)
 	{
 		auto it = m_types.find(typeid(T));
 		if (it == m_types.end())
@@ -46,39 +81,10 @@ public:
 
 			auto emplaceResult = m_types.emplace(typeid(T), i_metaTypeData);
 			type_data& metaTypeData = emplaceResult.first->second;
+			m_typeNames.emplace(typeName, &metaTypeData);
 
-			metaTypeData.isIntegral = std::is_integral<T>::value;
-			metaTypeData.isFloat = std::is_floating_point<T>::value;
-			metaTypeData.isArray = std::is_array<T>::value || is_std_vector<T>::value || is_std_array<T>::value;
-			metaTypeData.isEnum = std::is_enum<T>::value;
-			metaTypeData.isClass = std::is_class<T>::value;
-			metaTypeData.isFunction = std::is_function<T>::value;
-			metaTypeData.isPointer = std::is_pointer<T>::value;
-			metaTypeData.isMemberObjPointer = std::is_member_object_pointer<T>::value;
-			metaTypeData.isMemberFuncPointer = std::is_member_function_pointer<T>::value;
-			metaTypeData.isConst = std::is_const<T>::value;
-			metaTypeData.isSigned = std::is_signed<T>::value;
-			metaTypeData.isString = is_string<T>::value;
+			FillMetaTypeData<T>(metaTypeData);
 			metaTypeData.instanceAllocator = instanceAllocator;
-
-			if (is_std_vector<T>::value)
-			{
-				metaTypeData.arrayRank = 1U;
-				metaTypeData.arrayTraits.isStdArray = true;
-				metaTypeData.underlyingType[0] = new Type(Reflect<std_vector_type<T>::type>());
-			}
-			else
-			{
-				metaTypeData.arrayRank = std::rank<T>::value;
-				metaTypeData.arrayTraits.isSimpleArray = true;
-				metaTypeData.underlyingType[0] = new Type(Reflect<std::remove_all_extents_t<T>>());
-			}
-
-			if (metaTypeData.isArray)
-			{
-				metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
-				FillArrayExtent<T>(metaTypeData.arrayExtents.get());
-			}
 
 			Type typeWrapper(&(emplaceResult.first->second));
 
@@ -90,25 +96,83 @@ public:
 		}
 	}
 
+	template <typename T>
+	Type RegisterMetaType(const char* name)
+	{
+		auto it = m_types.find(typeid(T));
+		if (it == m_types.end())
+		{
+			const char* typeName = (nullptr != name) ? name : typeid(T).name();
+			type_data i_metaTypeData(typeName, m_nextId, sizeof(T), typeid(T));
+			++m_nextId;
+
+			auto emplaceResult = m_types.emplace(typeid(T), i_metaTypeData);
+			type_data& metaTypeData = emplaceResult.first->second;
+			m_typeNames.emplace(typeName, &metaTypeData);
+
+			FillMetaTypeData<T>(metaTypeData);
+			metaTypeData.instanceAllocator = DefaultInstanceAllocator<T>;
+
+			Type typeWrapper(&(emplaceResult.first->second));
+
+			return typeWrapper;
+		}
+		else
+		{
+			return Type(&(it->second));
+		}
+	}
+
+	template <typename T>
+	void FillMetaTypeData(type_data& metaTypeData)
+	{
+		metaTypeData.isIntegral = std::is_integral<T>::value;
+		metaTypeData.isFloat = std::is_floating_point<T>::value;
+		metaTypeData.isArray = std::is_array<T>::value || is_std_vector<T>::value || is_std_array<T>::value;
+		metaTypeData.isEnum = std::is_enum<T>::value;
+		metaTypeData.isClass = std::is_class<T>::value;
+		metaTypeData.isFunction = std::is_function<T>::value;
+		metaTypeData.isPointer = std::is_pointer<T>::value;
+		metaTypeData.isMemberObjPointer = std::is_member_object_pointer<T>::value;
+		metaTypeData.isMemberFuncPointer = std::is_member_function_pointer<T>::value;
+		metaTypeData.isConst = std::is_const<T>::value;
+		metaTypeData.isSigned = std::is_signed<T>::value;
+		metaTypeData.isString = is_string<T>::value;
+
+		if (metaTypeData.isArray)
+		{
+			ArrayDataResolver<T> arrayDataResolver(metaTypeData);
+		}
+	}
+
+	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
+
 	static RAVEN_SER_API Manager& GetRTTRManager();
 
 private:
 	std::unordered_map<std::type_index, type_data> m_types;
+	std::unordered_map<std::string, type_data*> m_typeNames;
 	std::size_t m_nextId = 0U;
 };
 
 template <typename T>
-Type MetaType(const char* name)
+Type MetaType(const char* name = nullptr)
 {
-	static_assert(std::is_default_constructible<T>::value, "Metatypes must be default constructible!");
 	return Manager::GetRTTRManager().RegisterMetaType<T>(name);
+}
+
+template <typename T>
+Type MetaType(const char* name, const MetaTypeInstanceAllocator& instanceAllocator)
+{
+	return Manager::GetRTTRManager().RegisterMetaType<T>(name, instanceAllocator);
 }
 
 template <typename T>
 Type Reflect()
 {
-	static_assert(std::is_default_constructible<T>::value, "Metatypes must be default constructible!");
-	return Manager::GetRTTRManager().RegisterMetaType<T>();
+	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr);
 }
+
+Type Reflect(const char* name);
 
 } // namespace rttr

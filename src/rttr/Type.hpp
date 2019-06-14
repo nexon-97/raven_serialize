@@ -59,6 +59,7 @@ public:
 	RAVEN_SER_API const char* GetName() const;
 	const std::size_t RAVEN_SER_API GetId() const;
 	const std::size_t RAVEN_SER_API GetSize() const;
+	const bool RAVEN_SER_API IsValid() const;
 	const bool RAVEN_SER_API IsIntegral() const;
 	const bool RAVEN_SER_API IsFloatingPoint() const;
 	const bool RAVEN_SER_API IsArray() const;
@@ -87,6 +88,9 @@ public:
 	RAVEN_SER_API void* GetArrayItemValuePtr(void* value, const std::size_t idx) const;
 
 	RAVEN_SER_API void* Instantiate() const;
+
+	bool RAVEN_SER_API operator==(const Type& other) const;
+	bool RAVEN_SER_API operator!=(const Type& other) const;
 
 	template <typename Signature>
 	Type& DeclProperty(const char* name, Signature signature)

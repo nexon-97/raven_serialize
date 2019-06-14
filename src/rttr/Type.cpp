@@ -36,6 +36,11 @@ Type::Type(type_data* typeData)
 	: m_typeData(typeData)
 {}
 
+const bool Type::IsValid() const
+{
+	return nullptr != m_typeData;
+}
+
 const char* Type::GetName() const
 {
 	return m_typeData->name;
@@ -285,6 +290,16 @@ void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
 void* Type::Instantiate() const
 {
 	return std::invoke(m_typeData->instanceAllocator);
+}
+
+bool Type::operator==(const Type& other) const
+{
+	return m_typeData == other.m_typeData;
+}
+
+bool Type::operator!=(const Type& other) const
+{
+	return !(*this == other);
 }
 
 } // namespace rttr
