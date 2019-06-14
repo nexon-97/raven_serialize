@@ -7,11 +7,13 @@ namespace
 const char* k_true = "true";
 const char* k_false = "false";
 const char* k_null = "null";
+const char* k_typeId = "$type$";
 
 }
 
-JsonWriter::JsonWriter(std::ostream& stream)
+JsonWriter::JsonWriter(std::ostream& stream, const bool writeClassNames)
 	: m_stream(stream)
+	, m_writeClassNames(writeClassNames)
 {}
 
 template <typename T>
@@ -123,6 +125,19 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		++m_padding;
 
 		std::size_t propertiesCount = type.GetPropertiesCount();
+
+		if (m_writeClassNames)
+		{
+			PrintPadding();
+			m_stream << '"' << k_typeId << "\" : \"" << type.GetName() << '"';
+
+			if (propertiesCount > 0U)
+			{
+				m_stream << ',';
+			}
+			m_stream << std::endl;
+		}
+
 		for (std::size_t i = 0U; i < propertiesCount; ++i)
 		{
 			auto property = type.GetProperty(i);
