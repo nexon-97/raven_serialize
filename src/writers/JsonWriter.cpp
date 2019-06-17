@@ -11,9 +11,8 @@ const char* k_typeId = "$type$";
 
 }
 
-JsonWriter::JsonWriter(std::ostream& stream, const bool writeClassNames)
+JsonWriter::JsonWriter(std::ostream& stream)
 	: m_stream(stream)
-	, m_writeClassNames(writeClassNames)
 {}
 
 template <typename T>
@@ -126,7 +125,7 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 		std::size_t propertiesCount = type.GetPropertiesCount();
 
-		if (m_writeClassNames)
+		// Write metaclass names
 		{
 			PrintPadding();
 			m_stream << '"' << k_typeId << "\" : \"" << type.GetName() << '"';
@@ -168,6 +167,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		--m_padding;
 		PrintPadding();
 		m_stream << '}';
+	}
+	else
+	{
+		// This type of meta-type is not supported?
+		m_stream << k_null;
 	}
 }
 

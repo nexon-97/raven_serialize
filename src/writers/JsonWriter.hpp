@@ -5,7 +5,7 @@
 class JsonWriter
 {
 public:
-	explicit RAVEN_SER_API JsonWriter(std::ostream& stream, const bool writeClassNames = false);
+	explicit RAVEN_SER_API JsonWriter(std::ostream& stream);
 
 	template <typename T>
 	void Write(const T& value)
@@ -21,5 +21,4 @@ private:
 private:
 	std::ostream& m_stream;
 	int m_padding = 0;
-	bool m_writeClassNames = false;
 };
