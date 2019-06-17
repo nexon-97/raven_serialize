@@ -4,10 +4,10 @@
 JsonReader::JsonReader(std::istream& stream)
 	: m_stream(stream)
 {
+	std::size_t startOffset = stream.tellg();
 	m_stream.seekg(0, std::ios::end);
-	std::size_t bufferSize = static_cast<std::size_t>(m_stream.tellg());
-	m_stream.seekg(0, std::ios::beg);
-	std::streamoff offset = 0U;
+	std::size_t bufferSize = static_cast<std::size_t>(m_stream.tellg()) - startOffset;
+	m_stream.seekg(startOffset, std::ios::beg);
 
 	char* buffer = new char[bufferSize];
 	m_stream.read(buffer, bufferSize);
@@ -16,16 +16,28 @@ JsonReader::JsonReader(std::istream& stream)
 	auto reader = builder.newCharReader();
 	std::string errorStr;
 
-	if (reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr))
-	{
-		int a = 0;
-	}
+	m_isOk = reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr);
 
 	delete[] buffer;
 }
 
-void JsonReader::Read(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+void JsonReader::Read(const rttr::Type& type, void* value)
 {
+	ReadImpl(type, value, m_jsonRoot);
+}
+
+void* JsonReader::Read(const rttr::Type& type)
+{
+	void* value = type.Instantiate();
+	ReadImpl(type, value, m_jsonRoot);
+
+	return value;
+}
+
+void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+{
+	assert(m_isOk);
+
 	if (type.GetTypeIndex() == typeid(bool))
 	{
 		*static_cast<bool*>(value) = jsonVal.asBool();
@@ -117,7 +129,7 @@ void JsonReader::Read(const rttr::Type& type, void* value, const Json::Value& js
 		{
 			void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
 
-			Read(itemType, itemValuePtr, jsonItem);
+			ReadImpl(itemType, itemValuePtr, jsonItem);
 
 			++i;
 		}
@@ -136,7 +148,7 @@ void JsonReader::Read(const rttr::Type& type, void* value, const Json::Value& js
 			bool needRelease = false;
 			property->GetMutatorContext(value, valuePtr, needRelease);
 
-			Read(propertyType, valuePtr, itemJsonVal);
+			ReadImpl(propertyType, valuePtr, itemJsonVal);
 			property->CallMutator(value, valuePtr);
 
 			if (needRelease)
@@ -145,4 +157,9 @@ void JsonReader::Read(const rttr::Type& type, void* value, const Json::Value& js
 			}
 		}
 	}
+}
+
+bool JsonReader::IsOk() const
+{
+	return m_isOk;
 }

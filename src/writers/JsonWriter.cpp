@@ -11,8 +11,9 @@ const char* k_typeId = "$type$";
 
 }
 
-JsonWriter::JsonWriter(std::ostream& stream)
+JsonWriter::JsonWriter(std::ostream& stream, const bool prettyPrint)
 	: m_stream(stream)
+	, m_prettyPrint(prettyPrint)
 {}
 
 template <typename T>
@@ -67,7 +68,12 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 	}
 	else if (type.IsArray())
 	{
-		m_stream << '[' << std::endl;
+		m_stream << '[';
+
+		if (m_prettyPrint)
+		{
+			m_stream << std::endl;
+		}
 		++m_padding;
 
 		if (type.IsDynamicArray())
@@ -76,16 +82,22 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 			auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
 			{
-				PrintPadding();
+				if (m_prettyPrint)
+				{
+					PrintPadding();
+				}
+
 				Write(itemType, itemPtr);
 
 				if (index + 1U < arraySize)
 				{
 					m_stream.put(',');
-
 				}
 
-				m_stream << std::endl;
+				if (m_prettyPrint)
+				{
+					m_stream << std::endl;
+				}
 			};
 
 			type.IterateArray(value, f);
@@ -98,7 +110,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 				auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
 				{
-					PrintPadding();
+					if (m_prettyPrint)
+					{
+						PrintPadding();
+					}
+
 					Write(itemType, itemPtr);
 
 					if (index + 1U < arraySize)
@@ -107,7 +123,10 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 					}
 
-					m_stream << std::endl;
+					if (m_prettyPrint)
+					{
+						m_stream << std::endl;
+					}
 				};
 
 				type.IterateArray(value, f);
@@ -115,26 +134,50 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		}
 
 		--m_padding;
-		PrintPadding();
+
+		if (m_prettyPrint)
+		{
+			PrintPadding();
+		}
+
 		m_stream << ']';
 	}
 	else if (type.IsClass())
 	{
-		m_stream << '{' << std::endl;
+		m_stream << '{';
+		if (m_prettyPrint)
+		{
+			m_stream << std::endl;
+		}
 		++m_padding;
 
 		std::size_t propertiesCount = type.GetPropertiesCount();
 
 		// Write metaclass names
 		{
-			PrintPadding();
-			m_stream << '"' << k_typeId << "\" : \"" << type.GetName() << '"';
+			if (m_prettyPrint)
+			{
+				PrintPadding();
+			}
+
+			if (m_prettyPrint)
+			{
+				m_stream << '"' << k_typeId << "\" : \"" << type.GetName() << '"';
+			}
+			else
+			{
+				m_stream << '"' << k_typeId << "\":\"" << type.GetName() << '"';
+			}
 
 			if (propertiesCount > 0U)
 			{
 				m_stream << ',';
 			}
-			m_stream << std::endl;
+
+			if (m_prettyPrint)
+			{
+				m_stream << std::endl;
+			}
 		}
 
 		for (std::size_t i = 0U; i < propertiesCount; ++i)
@@ -142,8 +185,19 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			auto property = type.GetProperty(i);
 			const rttr::Type& propertyType = property->GetType();
 
-			PrintPadding();
-			m_stream << '"' << property->GetName() << "\" : ";
+			if (m_prettyPrint)
+			{
+				PrintPadding();
+			}
+
+			if (m_prettyPrint)
+			{
+				m_stream << '"' << property->GetName() << "\" : ";
+			}
+			else
+			{
+				m_stream << '"' << property->GetName() << "\":";
+			}
 
 			void* valuePtr = nullptr;
 			bool needRelease = false;
@@ -161,11 +215,18 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 				m_stream.put(',');
 			}
 
-			m_stream << std::endl;
+			if (m_prettyPrint)
+			{
+				m_stream << std::endl;
+			}
 		}
 
 		--m_padding;
-		PrintPadding();
+		if (m_prettyPrint)
+		{
+			PrintPadding();
+		}
+		
 		m_stream << '}';
 	}
 	else if (type.IsPointer())
