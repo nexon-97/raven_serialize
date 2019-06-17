@@ -47,7 +47,7 @@ struct ArrayDataResolver
 };
 
 template <typename T>
-struct ArrayDataResolver<T, std::enable_if<is_std_vector<T>::value>>
+struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
 	{
@@ -61,7 +61,7 @@ struct ArrayDataResolver<T, std::enable_if<is_std_vector<T>::value>>
 };
 
 template <typename T>
-struct ArrayDataResolver<T, std::enable_if<std::is_array<T>::value, T>>
+struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value, T>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
 	{
@@ -71,6 +71,21 @@ struct ArrayDataResolver<T, std::enable_if<std::is_array<T>::value, T>>
 
 		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
 		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
+	}
+};
+
+template <typename T, typename Cond = void>
+struct PointerTraitsResolver
+{
+	PointerTraitsResolver(type_data& metaTypeData) {}
+};
+
+template <typename T>
+struct PointerTraitsResolver<T, std::enable_if_t<std::is_pointer<T>::value>>
+{
+	PointerTraitsResolver(type_data& metaTypeData)
+	{
+		metaTypeData.underlyingType[0] = new Type(Reflect<std::pointer_traits<T>::element_type>());
 	}
 };
 
@@ -133,6 +148,11 @@ public:
 		if (metaTypeData.isArray)
 		{
 			ArrayDataResolver<T> arrayDataResolver(metaTypeData);
+		}
+
+		if (metaTypeData.isPointer)
+		{
+			PointerTraitsResolver<T> pointerTraitsResolver(metaTypeData);
 		}
 	}
 

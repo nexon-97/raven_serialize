@@ -42,7 +42,7 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		}
 		else if (type.GetTypeIndex() == typeid(const char*))
 		{
-			m_stream << *static_cast<const char*>(value);
+			m_stream << static_cast<const char*>(value);
 		}
 
 		m_stream << '"';
@@ -168,6 +168,48 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		PrintPadding();
 		m_stream << '}';
 	}
+	else if (type.IsPointer())
+	{
+		auto pointedType = type.GetUnderlyingType(0U);
+
+		rttr::PointerTypeResolver* resolver = nullptr;
+		bool pointerResolved = false;
+
+		auto customResolverIt = m_customPointerTypeResolvers.find(pointedType.GetTypeIndex());
+		if (customResolverIt != m_customPointerTypeResolvers.end())
+		{
+			resolver = customResolverIt->second;
+		}
+
+		if (nullptr == resolver)
+		{
+			// Try default resolver
+		}
+
+		if (nullptr != resolver)
+		{
+			// Convert address to variable to pointer-to-pointer
+			const std::intptr_t* pointerAddress = reinterpret_cast<const std::intptr_t*>(value);
+			// Deference void* as pointer value
+			std::intptr_t pointerValue = *pointerAddress;
+			// Interpret resolved pointer value as new pointer to void
+			const void* pointedAddress = reinterpret_cast<const void*>(pointerValue);
+
+			auto resolveResult = resolver->Resolve(pointedType, pointedAddress);
+
+			if (resolveResult.resolved)
+			{
+				pointerResolved = true;
+				Write(resolveResult.resolvedType, resolveResult.resolvedValue);
+			}
+		}
+
+		if (!pointerResolved)
+		{
+			// No resolver found, so put null here
+			m_stream << k_null;
+		}
+	}
 	else
 	{
 		// This type of meta-type is not supported?
@@ -181,4 +223,9 @@ void JsonWriter::PrintPadding()
 	{
 		m_stream.put('\t');
 	}
+}
+
+void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)
+{
+	m_customPointerTypeResolvers.emplace(type.GetTypeIndex(), resolver);
 }

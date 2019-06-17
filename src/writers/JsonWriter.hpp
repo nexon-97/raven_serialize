@@ -1,6 +1,7 @@
 #pragma once
-#include "rttr/Type.hpp"
+#include "rttr/PointerTypeResolver.hpp"
 #include <ostream>
+#include <memory>
 
 class JsonWriter
 {
@@ -15,10 +16,13 @@ public:
 
 	void RAVEN_SER_API Write(const rttr::Type& type, const void* value);
 
+	void RAVEN_SER_API AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver);
+
 private:
 	void PrintPadding();
 
 private:
 	std::ostream& m_stream;
+	std::unordered_map<std::type_index, rttr::PointerTypeResolver*> m_customPointerTypeResolvers;
 	int m_padding = 0;
 };
