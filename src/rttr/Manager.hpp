@@ -23,10 +23,21 @@ void FillArrayExtent(std::size_t* arrayExtents)
 }
 
 template <typename T>
-auto DefaultInstanceAllocator = []() -> void*
+struct DefaultInstanceAllocator
 {
-	static_assert(std::is_default_constructible<T>::value, "Metatype must be default constructible!");
-	return reinterpret_cast<void*>(new T());
+	void* operator()() const
+	{
+		static_assert(std::is_default_constructible<T>::value, "Metatype must be default constructible!");
+		return reinterpret_cast<void*>(new T());
+	}
+};
+
+struct PlaceholderInstanceAllocator
+{
+	void* operator()() const
+	{
+		return nullptr;
+	}
 };
 
 template <typename T, typename Cond = void>
@@ -36,7 +47,7 @@ struct ArrayDataResolver
 };
 
 template <typename T>
-struct ArrayDataResolver<T, std::enable_if<is_std_vector<T>::value>>
+struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
 	{
@@ -50,7 +61,7 @@ struct ArrayDataResolver<T, std::enable_if<is_std_vector<T>::value>>
 };
 
 template <typename T>
-struct ArrayDataResolver<T, std::enable_if<std::is_array<T>::value, T>>
+struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value, T>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
 	{
@@ -63,15 +74,32 @@ struct ArrayDataResolver<T, std::enable_if<std::is_array<T>::value, T>>
 	}
 };
 
+template <typename T, typename Cond = void>
+struct PointerTraitsResolver
+{
+	PointerTraitsResolver(type_data& metaTypeData) {}
+};
+
+template <typename T>
+struct PointerTraitsResolver<T, std::enable_if_t<std::is_pointer<T>::value>>
+{
+	PointerTraitsResolver(type_data& metaTypeData)
+	{
+		metaTypeData.underlyingType[0] = new Type(Reflect<std::pointer_traits<T>::element_type>());
+	}
+};
+
 class Manager
 {
 public:
 	Manager() = default;
 	~Manager() = default;
 
-	template <typename T>
-	Type RegisterMetaType(const char* name, const MetaTypeInstanceAllocator& instanceAllocator)
+	template <typename T, typename AllocatorT = DefaultInstanceAllocator<T>>
+	Type RegisterMetaType(const char* name, AllocatorT allocator)
 	{
+		static_assert(std::is_invocable<AllocatorT>::value, "Instance allocator not invokable!");
+
 		auto it = m_types.find(typeid(T));
 		if (it == m_types.end())
 		{
@@ -84,7 +112,7 @@ public:
 			m_typeNames.emplace(typeName, &metaTypeData);
 
 			FillMetaTypeData<T>(metaTypeData);
-			metaTypeData.instanceAllocator = instanceAllocator;
+			metaTypeData.instanceAllocator = allocator;
 
 			Type typeWrapper(&(emplaceResult.first->second));
 
@@ -92,33 +120,11 @@ public:
 		}
 		else
 		{
-			return Type(&(it->second));
-		}
-	}
+			if (nullptr != name)
+			{
+				it->second.name = name;
+			}
 
-	template <typename T>
-	Type RegisterMetaType(const char* name)
-	{
-		auto it = m_types.find(typeid(T));
-		if (it == m_types.end())
-		{
-			const char* typeName = (nullptr != name) ? name : typeid(T).name();
-			type_data i_metaTypeData(typeName, m_nextId, sizeof(T), typeid(T));
-			++m_nextId;
-
-			auto emplaceResult = m_types.emplace(typeid(T), i_metaTypeData);
-			type_data& metaTypeData = emplaceResult.first->second;
-			m_typeNames.emplace(typeName, &metaTypeData);
-
-			FillMetaTypeData<T>(metaTypeData);
-			metaTypeData.instanceAllocator = DefaultInstanceAllocator<T>;
-
-			Type typeWrapper(&(emplaceResult.first->second));
-
-			return typeWrapper;
-		}
-		else
-		{
 			return Type(&(it->second));
 		}
 	}
@@ -143,6 +149,11 @@ public:
 		{
 			ArrayDataResolver<T> arrayDataResolver(metaTypeData);
 		}
+
+		if (metaTypeData.isPointer)
+		{
+			PointerTraitsResolver<T> pointerTraitsResolver(metaTypeData);
+		}
 	}
 
 	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
@@ -156,21 +167,21 @@ private:
 };
 
 template <typename T>
-Type MetaType(const char* name = nullptr)
+Type MetaType(const char* name)
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T>(name);
+	return Manager::GetRTTRManager().RegisterMetaType<T>(name, DefaultInstanceAllocator<T>());
 }
 
-template <typename T>
-Type MetaType(const char* name, const MetaTypeInstanceAllocator& instanceAllocator)
+template <typename T, typename Alloc>
+Type MetaType(const char* name, Alloc allocatorObject)
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T>(name, instanceAllocator);
+	return Manager::GetRTTRManager().RegisterMetaType<T, Alloc>(name, allocatorObject);
 }
 
 template <typename T>
 Type Reflect()
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr);
+	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr, PlaceholderInstanceAllocator());
 }
 
 Type Reflect(const char* name);

@@ -12,12 +12,19 @@ public:
 	template <typename T>
 	void Read(T& value)
 	{
-		Read(rttr::Reflect<T>(), &value, m_jsonRoot);
+		Read(rttr::Reflect<T>(), &value);
 	}
 
-	void RAVEN_SER_API Read(const rttr::Type& type, void* value, const Json::Value& jsonVal);
+	void RAVEN_SER_API Read(const rttr::Type& type, void* value);
+	RAVEN_SER_API void* Read(const rttr::Type& type);
+
+	bool RAVEN_SER_API IsOk() const;
+
+private:
+	void RAVEN_SER_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
 private:
 	std::istream& m_stream;
 	Json::Value m_jsonRoot;
+	bool m_isOk = false;
 };
