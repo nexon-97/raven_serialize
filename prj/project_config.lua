@@ -7,6 +7,7 @@ project "raven_serialize"
 	end
 	language "C++"
 	location(_ACTION)
+	cppdialect("c++17")
 
 	files { "../**.cpp", "../**.hpp" }
 	includedirs

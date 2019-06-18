@@ -1,5 +1,12 @@
 #include "writers/JsonReader.hpp"
 #include "rttr/Property.hpp"
+#include "rttr/PointerTypeResolver.hpp"
+#include "rttr/Manager.hpp"
+
+namespace
+{
+const char* k_typeId = "$type$";
+}
 
 JsonReader::JsonReader(std::istream& stream)
 	: m_stream(stream)
@@ -157,9 +164,81 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			}
 		}
 	}
+	else if (type.IsPointer())
+	{
+		auto pointedType = type.GetUnderlyingType(0U);
+
+		rttr::PointerTypeResolver* resolver = nullptr;
+		bool pointerResolved = false;
+
+		auto customResolverIt = m_customPointerTypeResolvers.find(pointedType.GetTypeIndex());
+		if (customResolverIt != m_customPointerTypeResolvers.end())
+		{
+			resolver = customResolverIt->second;
+		}
+
+		if (nullptr == resolver)
+		{
+			// Try default resolver here
+		}
+
+		// Serialized value type
+		rttr::Type serializedValueType = DeduceType(jsonVal);
+		void* serializedValue = serializedValueType.Instantiate();
+		if (serializedValueType.GetTypeIndex() == typeid(const char*))
+		{
+			char** strSerializedValue = reinterpret_cast<char**>(serializedValue);
+			*strSerializedValue = const_cast<char*>(jsonVal.asCString());
+		}
+
+		if (nullptr != resolver)
+		{
+			// Convert address to variable to pointer-to-pointer
+			std::intptr_t* pointerAddress = reinterpret_cast<std::intptr_t*>(value);
+			auto resolveResult = resolver->ResolveReverse(pointedType, serializedValueType, pointerAddress, serializedValue);
+		}
+	}
 }
 
 bool JsonReader::IsOk() const
 {
 	return m_isOk;
+}
+
+void JsonReader::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)
+{
+	m_customPointerTypeResolvers.emplace(type.GetTypeIndex(), resolver);
+}
+
+rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
+{
+	switch (jsonVal.type())
+	{
+	case Json::ValueType::stringValue:
+		return rttr::Reflect<const char*>();
+	case Json::ValueType::booleanValue:
+		return rttr::Reflect<bool>();
+	case Json::ValueType::intValue:
+		return rttr::Reflect<int64_t>();
+	case Json::ValueType::uintValue:
+		return rttr::Reflect<uint64_t>();
+	case Json::ValueType::realValue:
+		return rttr::Reflect<double>();
+	case Json::ValueType::arrayValue:
+		return rttr::Reflect<nullptr_t>();
+	case Json::ValueType::objectValue:
+	{
+		if (jsonVal.isMember(k_typeId))
+		{
+			return rttr::Reflect(jsonVal[k_typeId].asCString());
+		}
+		else
+		{
+			return rttr::Reflect<nullptr_t>();
+		}
+	}
+	case Json::ValueType::nullValue:
+	default:
+		return rttr::Reflect<nullptr_t>();
+	}
 }
