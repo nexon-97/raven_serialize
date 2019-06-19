@@ -35,18 +35,25 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 	}
 	else if (type.IsString())
 	{
-		m_stream << '"';
-
 		if (type.GetTypeIndex() == typeid(std::string))
 		{
-			m_stream << *static_cast<const std::string*>(value);
+			const std::string* stringPtr = reinterpret_cast<const std::string*>(value);
+			WriteStringLiteral(stringPtr->c_str());
 		}
 		else if (type.GetTypeIndex() == typeid(const char*))
 		{
-			m_stream << static_cast<const char*>(value);
-		}
+			char* const* cStringPtr = reinterpret_cast<char* const*>(value);
+			char* cStringVal = *cStringPtr;
 
-		m_stream << '"';
+			if (nullptr == cStringVal)
+			{
+				m_stream << k_null;
+			}
+			else
+			{
+				WriteStringLiteral(cStringVal);
+			}
+		}
 	}
 	else if (type.IsIntegral())
 	{
@@ -250,9 +257,9 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		if (nullptr != resolver)
 		{
 			// Convert address to variable to pointer-to-pointer
-			const std::intptr_t* pointerAddress = reinterpret_cast<const std::intptr_t*>(value);
+			const std::uintptr_t* pointerAddress = reinterpret_cast<const std::uintptr_t*>(value);
 			// Deference void* as pointer value
-			std::intptr_t pointerValue = *pointerAddress;
+			std::uintptr_t pointerValue = *pointerAddress;
 			// Interpret resolved pointer value as new pointer to void
 			const void* pointedAddress = reinterpret_cast<const void*>(pointerValue);
 
@@ -284,6 +291,11 @@ void JsonWriter::PrintPadding()
 	{
 		m_stream.put('\t');
 	}
+}
+
+void JsonWriter::WriteStringLiteral(const char* _literal)
+{
+	m_stream << '"' << _literal << '"';
 }
 
 void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)

@@ -20,6 +20,7 @@ public:
 
 private:
 	void PrintPadding();
+	void WriteStringLiteral(const char* _literal);
 
 private:
 	std::ostream& m_stream;

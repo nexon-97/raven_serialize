@@ -45,13 +45,17 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 {
 	assert(m_isOk);
 
+	if (type.GetTypeIndex() == typeid(nullptr_t))
+	{
+		// Skip nullptr
+	}
 	if (type.GetTypeIndex() == typeid(bool))
 	{
 		*static_cast<bool*>(value) = jsonVal.asBool();
 	}
 	else if (type.IsString())
 	{
-		auto strValue = jsonVal.asCString();
+		const char* strValue = jsonVal.asCString();
 
 		if (type.GetTypeIndex() == typeid(std::string))
 		{
@@ -59,7 +63,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 		}
 		else if (type.GetTypeIndex() == typeid(const char*))
 		{
-			//*const_cast<char*>(static_cast<const char*>(value)) = const_cast<char*>(strValue);
+			char** strSerializedValue = reinterpret_cast<char**>(value);
+			*strSerializedValue = const_cast<char*>(strValue);
 		}
 	}
 	else if (type.IsIntegral())
@@ -184,17 +189,18 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 
 		// Serialized value type
 		rttr::Type serializedValueType = DeduceType(jsonVal);
-		void* serializedValue = serializedValueType.Instantiate();
-		if (serializedValueType.GetTypeIndex() == typeid(const char*))
+		void* serializedValue = nullptr;
+
+		if (serializedValueType.GetTypeIndex() != typeid(nullptr_t))
 		{
-			char** strSerializedValue = reinterpret_cast<char**>(serializedValue);
-			*strSerializedValue = const_cast<char*>(jsonVal.asCString());
+			serializedValue = serializedValueType.Instantiate();
+			ReadImpl(serializedValueType, serializedValue, jsonVal);
 		}
 
 		if (nullptr != resolver)
 		{
 			// Convert address to variable to pointer-to-pointer
-			std::intptr_t* pointerAddress = reinterpret_cast<std::intptr_t*>(value);
+			std::uintptr_t* pointerAddress = reinterpret_cast<std::uintptr_t*>(value);
 			auto resolveResult = resolver->ResolveReverse(pointedType, serializedValueType, pointerAddress, serializedValue);
 		}
 	}

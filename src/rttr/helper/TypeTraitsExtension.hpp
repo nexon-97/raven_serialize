@@ -88,9 +88,21 @@ const ValueType& AccessBySignature(AccessorMethod<T, ValueType> signature, const
 }
 
 template <typename T, typename ValueType>
-ValueType AccessBySignature(AccessorMethodByValue<T, ValueType> signature, const T* object)
+const ValueType& AccessBySignature(AccessorMethodByValue<T, ValueType> signature, const T* object)
 {
 	return std::invoke(signature, object);
+}
+
+template <typename T, typename ValueType>
+ValueType AccessBySignature(AccessorMethodByValueNonConst<T, ValueType> signature, const T* object)
+{
+	return std::invoke(signature, object);
+}
+
+template <typename T, typename ValueType>
+const ValueType& AccessBySignature(AccessorMethodNonConst<T, ValueType> signature, const T* object)
+{
+	return std::invoke(signature, const_cast<T*>(object));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -128,6 +140,20 @@ struct ExtractValueType<MutatorMethodByValue<T, ValueType>>
 	typedef ValueType type;
 };
 
+template <typename T, typename ValueType>
+struct ExtractValueType<AccessorMethodByValueNonConst<T, ValueType>>
+{
+	typedef ValueType type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractValueType<AccessorMethodNonConst<T, ValueType>>
+{
+	typedef ValueType type;
+};
+
+///////////////////////////////////////////////////////////////////////////////////////
+
 template <typename SignatureType>
 struct ExtractClassType {};
 
@@ -145,6 +171,18 @@ struct ExtractClassType<AccessorMethod<T, ValueType>>
 
 template <typename T, typename ValueType>
 struct ExtractClassType<AccessorMethodByValue<T, ValueType>>
+{
+	typedef T type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<AccessorMethodByValueNonConst<T, ValueType>>
+{
+	typedef T type;
+};
+
+template <typename T, typename ValueType>
+struct ExtractClassType<AccessorMethodNonConst<T, ValueType>>
 {
 	typedef T type;
 };

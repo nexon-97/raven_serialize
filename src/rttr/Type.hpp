@@ -24,18 +24,19 @@ struct type_data
 	const std::size_t id = 0U;
 	const std::size_t size = 0U;
 	const std::type_index typeIndex;
-	bool isIntegral;
-	bool isFloat;
-	bool isArray;
-	bool isEnum;
-	bool isClass;
-	bool isFunction;
-	bool isPointer;
-	bool isMemberObjPointer;
-	bool isMemberFuncPointer;
-	bool isConst;
-	bool isSigned;
-	bool isString;
+	bool isIntegral : 1;
+	bool isFloat : 1;
+	bool isArray : 1;
+	bool isEnum : 1;
+	bool isClass : 1;
+	bool isFunction : 1;
+	bool isPointer : 1;
+	bool isMemberObjPointer : 1;
+	bool isMemberFuncPointer : 1;
+	bool isConst : 1;
+	bool isSigned : 1;
+	bool isString : 1;
+	bool isUserDefined : 1;
 	std::size_t arrayRank;
 	struct ArrayTraits
 	{
@@ -72,6 +73,7 @@ public:
 	const bool RAVEN_SER_API IsConst() const;
 	const bool RAVEN_SER_API IsString() const;
 	const bool RAVEN_SER_API IsSigned() const;
+
 	// Get type of the array, enum underlying value
 	RAVEN_SER_API const Type& GetUnderlyingType(const std::size_t index = 0U) const;
 	const std::size_t RAVEN_SER_API GetArrayRank() const;

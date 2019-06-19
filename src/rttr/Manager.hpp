@@ -97,7 +97,7 @@ public:
 	~Manager() = default;
 
 	template <typename T, typename AllocatorT = DefaultInstanceAllocator<T>>
-	Type RegisterMetaType(const char* name, AllocatorT allocator)
+	Type RegisterMetaType(const char* name, AllocatorT allocator, const bool userDefined)
 	{
 		static_assert(std::is_invocable<AllocatorT>::value, "Instance allocator not invokable!");
 
@@ -113,17 +113,36 @@ public:
 			m_typeNames.emplace(typeName, &metaTypeData);
 
 			FillMetaTypeData<T>(metaTypeData);
-			metaTypeData.instanceAllocator = allocator;
 
+			if (!std::is_same<AllocatorT, PlaceholderInstanceAllocator>::value)
+			{
+				metaTypeData.instanceAllocator = allocator;
+			}
+			
 			Type typeWrapper(&(emplaceResult.first->second));
 
 			return typeWrapper;
 		}
 		else
 		{
-			if (nullptr != name)
+			if (userDefined)
 			{
-				it->second.name = name;
+				auto& metaTypeData = it->second;
+
+				if (nullptr != name)
+				{
+					metaTypeData.name = name;
+				}
+
+				if (!metaTypeData.isUserDefined)
+				{
+					metaTypeData.isUserDefined = true;
+				}
+
+				if (!std::is_same<AllocatorT, PlaceholderInstanceAllocator>::value)
+				{
+					metaTypeData.instanceAllocator = allocator;
+				}
 			}
 
 			return Type(&(it->second));
@@ -158,6 +177,7 @@ public:
 	}
 
 	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
+	Type RAVEN_SER_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
 
 	static RAVEN_SER_API Manager& GetRTTRManager();
 
@@ -170,21 +190,22 @@ private:
 template <typename T>
 Type MetaType(const char* name)
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T>(name, DefaultInstanceAllocator<T>());
+	return Manager::GetRTTRManager().RegisterMetaType<T>(name, DefaultInstanceAllocator<T>(), true);
 }
 
 template <typename T, typename Alloc>
 Type MetaType(const char* name, Alloc allocatorObject)
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T, Alloc>(name, allocatorObject);
+	return Manager::GetRTTRManager().RegisterMetaType<T, Alloc>(name, allocatorObject, true);
 }
 
 template <typename T>
 Type Reflect()
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr, PlaceholderInstanceAllocator());
+	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr, PlaceholderInstanceAllocator(), false);
 }
 
-Type Reflect(const char* name);
+Type RAVEN_SER_API Reflect(const char* name);
+Type RAVEN_SER_API Reflect(const std::type_index& typeIndex);
 
 } // namespace rttr

@@ -64,21 +64,21 @@ public:
 	void GetValue(const void* object, void*& i_storage, bool& needRelease) final
 	{
 		// There is no need to allocate any additional memory, just cast the member pointer to void* and return
-		const void* valuePtr = &AccessBySignature(m_signature, static_cast<const ClassType*>(object));
+		const void* valuePtr = &AccessBySignature(m_signature, reinterpret_cast<const ClassType*>(object));
 		i_storage = const_cast<void*>(valuePtr);
 		needRelease = false;
 	}
 
 	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) final
 	{
-		const void* valuePtr = &AccessBySignature(m_signature, static_cast<const ClassType*>(object));
+		const void* valuePtr = &AccessBySignature(m_signature, reinterpret_cast<const ClassType*>(object));
 		i_storage = const_cast<void*>(valuePtr);
 		needRelease = false;
 	}
 
 	void CallMutator(void* object, void* value) final
 	{
-		SetValue(static_cast<ClassType*>(object), static_cast<ValueType*>(value));
+		SetValue(reinterpret_cast<ClassType*>(object), reinterpret_cast<ValueType*>(value));
 	}
 
 private:
@@ -108,7 +108,7 @@ public:
 
 	void GetValue(const void* object, void*& i_storage, bool& needRelease) final
 	{
-		auto storage = new ValueType(AccessBySignature(m_getterSignature, static_cast<const ClassType*>(object)));
+		auto storage = new ValueType(AccessBySignature(m_getterSignature, reinterpret_cast<const ClassType*>(object)));
 		i_storage = storage;
 		needRelease = true;
 	}
@@ -122,7 +122,7 @@ public:
 
 	void CallMutator(void* object, void* value) final
 	{
-		SetValue(static_cast<ClassType*>(object), static_cast<ValueType*>(value));
+		SetValue(reinterpret_cast<ClassType*>(object), reinterpret_cast<ValueType*>(value));
 	}
 
 private:

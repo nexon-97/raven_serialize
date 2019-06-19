@@ -10,27 +10,8 @@ type_data::type_data(const char* name, const std::size_t id, const std::size_t s
 	, size(size)
 	, typeIndex(typeIndex)
 	, underlyingType{ nullptr }
+	, isUserDefined(false)
 {}
-
-/*type_data::type_data(type_data&& other) noexcept
-	: name(name)
-	, id(id)
-	, properties(std::move(other.properties))
-	, arrayExtents(std::move(other.arrayExtents))
-	, arrayRank(other.arrayRank)
-	, isIntegral(other.isIntegral)
-	, isFloat(other.isFloat)
-	, isArray(other.isArray)
-	, isEnum(other.isEnum)
-	, isClass(other.isClass)
-	, isFunction(other.isFunction)
-	, isPointer(other.isPointer)
-	, isMemberObjPointer(other.isMemberObjPointer)
-	, isMemberFuncPointer(other.isMemberFuncPointer)
-	, isConst(other.isConst)
-	, isSigned(other.isSigned)
-
-{}*/
 
 Type::Type(type_data* typeData)
 	: m_typeData(typeData)
@@ -220,14 +201,17 @@ void Type::IterateArray(const void* value, const ArrayIteratorFunc& f) const
 
 	if (m_typeData->arrayTraits.isStdArray)
 	{
-		auto vectorPtr = static_cast<const std::vector<int>*>(value);
-		std::size_t size = vectorPtr->size();
-		const uint8_t* dataPtr = reinterpret_cast<const uint8_t*>(vectorPtr->data());
+		std::size_t size = GetDynamicArraySize(value);
+
+		auto vectorPtr = reinterpret_cast<const std::vector<int>*>(value);
+		uintptr_t dataPtr = reinterpret_cast<uintptr_t>(vectorPtr->data());
 		auto underlyingType = GetUnderlyingType();
+		const std::size_t itemTypeSize = underlyingType.GetSize();
 
 		for (std::size_t i = 0U; i < size; ++i)
 		{
-			f(underlyingType, i, dataPtr + underlyingType.GetSize() * i);
+			f(underlyingType, i, reinterpret_cast<void*>(dataPtr));
+			dataPtr += itemTypeSize;
 		}
 	}
 	else if (m_typeData->arrayTraits.isSimpleArray)
@@ -253,10 +237,11 @@ std::size_t Type::GetDynamicArraySize(const void* value) const
 
 	if (m_typeData->arrayTraits.isStdArray)
 	{
-		auto vectorPtr = static_cast<const std::vector<int>*>(value);
-		std::size_t size = vectorPtr->size();
+		auto vectorPtr = static_cast<const std::vector<uint8_t>*>(value);
+		std::size_t vectorByteSize = vectorPtr->size();
+		std::size_t vectorElementsCount = vectorByteSize / m_typeData->underlyingType[0]->GetSize();
 		
-		return size;
+		return vectorElementsCount;
 	}
 
 	return 0U;

@@ -36,7 +36,7 @@ public:
 public:
 	virtual ResolveResult Resolve(const Type& ptrType, const void* ptr) = 0;
 	// [TODO] Remove better names for interface methods
-	virtual ResolveResult ResolveReverse(const Type& ptrType, const Type& dataType, std::intptr_t* ptr, const void* dataValue) = 0;
+	virtual ResolveResult ResolveReverse(const Type& ptrType, const Type& dataType, std::uintptr_t* ptr, const void* dataValue) = 0;
 };
 
 class DefaultPointerTypeResolver
@@ -48,7 +48,7 @@ public:
 		return ResolveResult();
 	}
 
-	ResolveResult ResolveReverse(const Type& ptrType, const Type& dataType, std::intptr_t* ptr, const void* dataValue) final
+	ResolveResult ResolveReverse(const Type& ptrType, const Type& dataType, std::uintptr_t* ptr, const void* dataValue) final
 	{
 		return ResolveResult();
 	}
