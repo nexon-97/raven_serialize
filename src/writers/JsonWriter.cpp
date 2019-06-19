@@ -1,6 +1,9 @@
 #include "writers/JsonWriter.hpp"
 #include "rttr/Property.hpp"
 
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+#include <codecvt>
+
 namespace
 {
 
@@ -8,6 +11,7 @@ const char* k_true = "true";
 const char* k_false = "false";
 const char* k_null = "null";
 const char* k_typeId = "$type$";
+const char k_stringParethesis = '"';
 
 }
 
@@ -40,6 +44,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			const std::string* stringPtr = reinterpret_cast<const std::string*>(value);
 			WriteStringLiteral(stringPtr->c_str());
 		}
+		else if (type.GetTypeIndex() == typeid(std::wstring))
+		{
+			const std::wstring* stringPtr = reinterpret_cast<const std::wstring*>(value);
+			WriteStringLiteral(stringPtr->c_str());
+		}
 		else if (type.GetTypeIndex() == typeid(const char*))
 		{
 			char* const* cStringPtr = reinterpret_cast<char* const*>(value);
@@ -67,6 +76,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			uint64_t intValue = type.CastToUnsignedInteger(value);
 			m_stream << intValue;
 		}
+	}
+	else if (type.IsEnum())
+	{
+		const rttr::Type& enumUnderlyingType = type.GetUnderlyingType(0U);
+		Write(enumUnderlyingType, value);
 	}
 	else if (type.IsFloatingPoint())
 	{
@@ -167,14 +181,16 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 				PrintPadding();
 			}
 
+			WriteStringLiteral(k_typeId);
 			if (m_prettyPrint)
 			{
-				m_stream << '"' << k_typeId << "\" : \"" << type.GetName() << '"';
+				m_stream << " : ";
 			}
 			else
 			{
-				m_stream << '"' << k_typeId << "\":\"" << type.GetName() << '"';
+				m_stream << ':';
 			}
+			WriteStringLiteral(type.GetName());
 
 			if (propertiesCount > 0U)
 			{
@@ -197,13 +213,14 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 				PrintPadding();
 			}
 
+			WriteStringLiteral(property->GetName());
 			if (m_prettyPrint)
 			{
-				m_stream << '"' << property->GetName() << "\" : ";
+				m_stream << " : ";
 			}
 			else
 			{
-				m_stream << '"' << property->GetName() << "\":";
+				m_stream << ':';
 			}
 
 			void* valuePtr = nullptr;
@@ -295,7 +312,17 @@ void JsonWriter::PrintPadding()
 
 void JsonWriter::WriteStringLiteral(const char* _literal)
 {
-	m_stream << '"' << _literal << '"';
+	m_stream << k_stringParethesis << _literal << k_stringParethesis;
+}
+
+void JsonWriter::WriteStringLiteral(const wchar_t* _literal)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+	std::string utf8String = converter.to_bytes(_literal);
+
+	m_stream.put(k_stringParethesis);
+	m_stream.write(utf8String.data(), utf8String.size());
+	m_stream.put(k_stringParethesis);
 }
 
 void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)

@@ -21,6 +21,7 @@ public:
 private:
 	void PrintPadding();
 	void WriteStringLiteral(const char* _literal);
+	void WriteStringLiteral(const wchar_t* _literal);
 
 private:
 	std::ostream& m_stream;

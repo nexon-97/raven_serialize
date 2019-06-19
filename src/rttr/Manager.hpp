@@ -90,6 +90,21 @@ struct PointerTraitsResolver<T, std::enable_if_t<std::is_pointer<T>::value>>
 	}
 };
 
+template <typename T, typename Cond = void>
+struct EnumTraitsResolver
+{
+	EnumTraitsResolver(type_data& metaTypeData) {}
+};
+
+template <typename T>
+struct EnumTraitsResolver<T, std::enable_if_t<std::is_enum<T>::value>>
+{
+	EnumTraitsResolver(type_data& metaTypeData)
+	{
+		metaTypeData.underlyingType[0] = new Type(Reflect<std::underlying_type<T>::type>());
+	}
+};
+
 class Manager
 {
 public:
@@ -173,6 +188,11 @@ public:
 		if (metaTypeData.isPointer)
 		{
 			PointerTraitsResolver<T> pointerTraitsResolver(metaTypeData);
+		}
+
+		if (metaTypeData.isEnum)
+		{
+			EnumTraitsResolver<T> enumTraitsResolver(metaTypeData);
 		}
 	}
 

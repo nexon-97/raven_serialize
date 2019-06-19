@@ -14,6 +14,9 @@ template <>
 struct is_string<std::string> : std::true_type {};
 
 template <>
+struct is_string<std::wstring> : std::true_type {};
+
+template <>
 struct is_string<const char*> : std::true_type {};
 
 template <typename>
