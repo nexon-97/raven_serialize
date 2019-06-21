@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <memory>
 
 namespace rttr
 {
@@ -42,6 +43,45 @@ struct is_std_array : std::false_type {};
 
 template <typename T, std::size_t N>
 struct is_std_array<std::array<T, N>> : std::true_type {};
+
+template <typename>
+struct is_smart_ptr : std::false_type {};
+
+template <typename T>
+struct is_smart_ptr<std::unique_ptr<T>> : std::true_type {};
+
+template <typename T>
+struct is_smart_ptr<std::shared_ptr<T>> : std::true_type {};
+
+template <typename>
+struct smart_ptr_type
+{
+	typedef nullptr_t type;
+};
+
+template <typename T>
+struct smart_ptr_type<std::shared_ptr<T>>
+{
+	typedef std::add_pointer_t<T> type;
+};
+
+template <typename T>
+struct smart_ptr_type<std::unique_ptr<T>>
+{
+	typedef std::add_pointer_t<T> type;
+};
+
+template <typename>
+struct is_shared_ptr : std::false_type {};
+
+template <typename T>
+struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+
+template <typename>
+struct is_unique_ptr : std::false_type {};
+
+template <typename T>
+struct is_unique_ptr<std::unique_ptr<T>> : std::true_type {};
 
 ///////////////////////////////////////////////////////////////////////////////////////
 

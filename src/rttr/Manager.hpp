@@ -1,5 +1,6 @@
 #pragma once
 #include "rttr/Type.hpp"
+#include "helper/TypeTraitsExtension.hpp"
 #include "raven_serialize.hpp"
 
 #include <unordered_map>
@@ -41,6 +42,44 @@ struct PlaceholderInstanceAllocator
 	}
 };
 
+template <typename T>
+std::type_index GetTypeIndexFromPointerType(void* value)
+{
+	static_assert(std::is_pointer<T>::value, "Can't get type index from pointer type");
+
+	T ptrValue = *reinterpret_cast<T*>(value);
+	return typeid(*ptrValue);
+}
+
+template <typename T>
+struct SmartPtrRawValueResolver
+{
+	void* operator()(void* value)
+	{
+		return nullptr;
+	}
+};
+
+template <typename T>
+struct SmartPtrRawValueResolver<std::shared_ptr<T>>
+{
+	void* operator()(void* value)
+	{
+		std::shared_ptr<T>* smartptr = reinterpret_cast<std::shared_ptr<T>*>(value);
+		return smartptr->get();
+	}
+};
+
+template <typename T>
+struct SmartPtrRawValueResolver<std::unique_ptr<T>>
+{
+	void* operator()(void* value)
+	{
+		std::unique_ptr<T>* smartptr = reinterpret_cast<std::unique_ptr<T>*>(value);
+		return smartptr->get();
+	}
+};
+
 template <typename T, typename Cond = void>
 struct ArrayDataResolver
 {
@@ -76,6 +115,22 @@ struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value, T>>
 };
 
 template <typename T, typename Cond = void>
+struct SmartPointerTraitsResolver
+{
+	SmartPointerTraitsResolver(type_data& metaTypeData) {}
+};
+
+template <typename T>
+struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
+{
+	SmartPointerTraitsResolver(type_data& metaTypeData)
+	{
+		metaTypeData.underlyingType[0] = new Type(Reflect<smart_ptr_type<T>::type>());
+		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
+	}
+};
+
+template <typename T, typename Cond = void>
 struct PointerTraitsResolver
 {
 	PointerTraitsResolver(type_data& metaTypeData) {}
@@ -87,6 +142,7 @@ struct PointerTraitsResolver<T, std::enable_if_t<std::is_pointer<T>::value>>
 	PointerTraitsResolver(type_data& metaTypeData)
 	{
 		metaTypeData.underlyingType[0] = new Type(Reflect<std::pointer_traits<T>::element_type>());
+		metaTypeData.pointerTypeIndexResolverFunc = GetTypeIndexFromPointerType<T>;
 	}
 };
 
@@ -174,6 +230,7 @@ public:
 		metaTypeData.isClass = std::is_class<T>::value;
 		metaTypeData.isFunction = std::is_function<T>::value;
 		metaTypeData.isPointer = std::is_pointer<T>::value;
+		metaTypeData.isSmartPointer = is_smart_ptr<T>::value;
 		metaTypeData.isMemberObjPointer = std::is_member_object_pointer<T>::value;
 		metaTypeData.isMemberFuncPointer = std::is_member_function_pointer<T>::value;
 		metaTypeData.isConst = std::is_const<T>::value;
@@ -193,6 +250,11 @@ public:
 		if (metaTypeData.isEnum)
 		{
 			EnumTraitsResolver<T> enumTraitsResolver(metaTypeData);
+		}
+
+		if (metaTypeData.isSmartPointer)
+		{
+			SmartPointerTraitsResolver<T> smartptrTraitsResolver(metaTypeData);
 		}
 	}
 

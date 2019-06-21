@@ -1,4 +1,5 @@
 #include "writers/JsonWriter.hpp"
+#include "rttr/Manager.hpp"
 #include "rttr/Property.hpp"
 
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
@@ -11,6 +12,7 @@ const char* k_true = "true";
 const char* k_false = "false";
 const char* k_null = "null";
 const char* k_typeId = "$type$";
+const char* k_ptrClassKey = "$ptr_type$";
 const char k_stringParethesis = '"';
 
 }
@@ -76,6 +78,13 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			uint64_t intValue = type.CastToUnsignedInteger(value);
 			m_stream << intValue;
 		}
+	}
+	else if (type.IsSmartPointer())
+	{
+		auto pointerType = type.GetUnderlyingType(0U);
+		void* smartPtrValue = type.GetSmartPtrValue(const_cast<void*>(value));
+
+		Write(pointerType, &smartPtrValue);
 	}
 	else if (type.IsEnum())
 	{
@@ -256,11 +265,12 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 	else if (type.IsPointer())
 	{
 		auto pointedType = type.GetUnderlyingType(0U);
+		auto pointerTypeIndex = type.GetPointerTypeIndex(const_cast<void*>(value));
 
 		rttr::PointerTypeResolver* resolver = nullptr;
 		bool pointerResolved = false;
 
-		auto customResolverIt = m_customPointerTypeResolvers.find(pointedType.GetTypeIndex());
+		auto customResolverIt = m_customPointerTypeResolvers.find(pointerTypeIndex);
 		if (customResolverIt != m_customPointerTypeResolvers.end())
 		{
 			resolver = customResolverIt->second;
@@ -291,8 +301,39 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 		if (!pointerResolved)
 		{
+			const char* typeName = nullptr;
+
 			// No resolver found, so put null here
-			m_stream << k_null;
+			rttr::Type metaType = rttr::Reflect(pointerTypeIndex);
+			if (metaType.IsValid())
+			{
+				typeName = metaType.GetName();
+			}
+			else
+			{
+				typeName = pointerTypeIndex.name();
+			}
+
+			m_stream << '{';
+			if (m_prettyPrint)
+			{
+				m_stream << std::endl;
+			}
+			++m_padding;
+
+			PrintPadding();
+			WriteKeyValue(k_typeId, "ptr");
+			m_stream << ',' << std::endl;
+			PrintPadding();
+			WriteKeyValue(k_ptrClassKey, typeName);
+
+			--m_padding;
+			if (m_prettyPrint)
+			{
+				m_stream << std::endl;
+				PrintPadding();
+			}
+			m_stream << '}';
 		}
 	}
 	else
@@ -323,6 +364,20 @@ void JsonWriter::WriteStringLiteral(const wchar_t* _literal)
 	m_stream.put(k_stringParethesis);
 	m_stream.write(utf8String.data(), utf8String.size());
 	m_stream.put(k_stringParethesis);
+}
+
+void JsonWriter::WriteKeyValue(const char* key, const char* value)
+{
+	WriteStringLiteral(key);
+	if (m_prettyPrint)
+	{
+		m_stream << " : ";
+	}
+	else
+	{
+		m_stream << ':';
+	}
+	WriteStringLiteral(value);
 }
 
 void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)

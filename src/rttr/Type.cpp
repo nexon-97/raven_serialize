@@ -72,6 +72,11 @@ const bool Type::IsPointer() const
 	return m_typeData->isPointer;
 }
 
+const bool Type::IsSmartPointer() const
+{
+	return m_typeData->isSmartPointer;
+}
+
 const bool Type::IsMemberObjectPointer() const
 {
 	return m_typeData->isMemberObjPointer;
@@ -275,6 +280,24 @@ void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
 void* Type::Instantiate() const
 {
 	return std::invoke(m_typeData->instanceAllocator);
+}
+
+void* Type::GetSmartPtrValue(void* value) const
+{
+	assert(IsSmartPointer());
+
+	if (m_typeData->smartPtrValueResolver)
+	{
+		return m_typeData->smartPtrValueResolver(value);
+	}
+	
+	return nullptr;
+}
+
+std::type_index Type::GetPointerTypeIndex(void* value) const
+{
+	assert(IsPointer());
+	return m_typeData->pointerTypeIndexResolverFunc(value);
 }
 
 bool Type::operator==(const Type& other) const

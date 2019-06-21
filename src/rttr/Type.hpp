@@ -17,6 +17,8 @@ class Property;
 class Type;
 
 using MetaTypeInstanceAllocator = std::function<void*()>;
+using PointerTypeIndexResolverFunc = std::function<std::type_index(void*)>;
+using SmartPtrValueResolver = std::function<void* (void*)>;
 
 struct type_data
 {
@@ -31,6 +33,7 @@ struct type_data
 	bool isClass : 1;
 	bool isFunction : 1;
 	bool isPointer : 1;
+	bool isSmartPointer : 1;
 	bool isMemberObjPointer : 1;
 	bool isMemberFuncPointer : 1;
 	bool isConst : 1;
@@ -48,6 +51,8 @@ struct type_data
 	std::shared_ptr<std::size_t> arrayExtents;
 	std::vector<std::shared_ptr<Property>> properties;
 	MetaTypeInstanceAllocator instanceAllocator;
+	PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
+	SmartPtrValueResolver smartPtrValueResolver;
 
 	RAVEN_SER_API type_data(const char* name, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept;
 };
@@ -68,6 +73,7 @@ public:
 	const bool RAVEN_SER_API IsClass() const;
 	const bool RAVEN_SER_API IsFunction() const;
 	const bool RAVEN_SER_API IsPointer() const;
+	const bool RAVEN_SER_API IsSmartPointer() const;
 	const bool RAVEN_SER_API IsMemberObjectPointer() const;
 	const bool RAVEN_SER_API IsMemberFunctionPointer() const;
 	const bool RAVEN_SER_API IsConst() const;
@@ -90,6 +96,8 @@ public:
 	RAVEN_SER_API void* GetArrayItemValuePtr(void* value, const std::size_t idx) const;
 
 	RAVEN_SER_API void* Instantiate() const;
+	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
+	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
 
 	bool RAVEN_SER_API operator==(const Type& other) const;
 	bool RAVEN_SER_API operator!=(const Type& other) const;
