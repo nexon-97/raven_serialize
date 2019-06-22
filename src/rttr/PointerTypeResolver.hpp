@@ -33,24 +33,39 @@ public:
 		{}
 	};
 
+	// Resolve result with additional context
+	template <typename T>
+	struct ResolveResultWithContext
+		: public ResolveResult
+	{
+		T context;
+
+		ResolveResultWithContext() = delete;
+
+		explicit ResolveResultWithContext(const Type& resolvedType, const void* resolvedValue, T&& context)
+			: ResolveResult(resolvedType, resolvedValue)
+			, context(std::move(context))
+		{}
+	};
+
 public:
-	virtual ResolveResult Resolve(const Type& ptrType, const void* ptr) = 0;
+	virtual std::unique_ptr<ResolveResult> Resolve(const Type& ptrType, const void* ptr) = 0;
 	// [TODO] Remove better names for interface methods
-	virtual ResolveResult ResolveReverse(const Type& ptrType, const Type& dataType, std::uintptr_t* ptr, const void* dataValue) = 0;
+	virtual std::unique_ptr<ResolveResult> ResolveReverse(const Type& ptrType, const Type& dataType, std::uintptr_t* ptr, const void* dataValue) = 0;
 };
 
 class DefaultPointerTypeResolver
 	: public PointerTypeResolver
 {
 public:
-	ResolveResult Resolve(const Type& ptrType, const void* ptr) final
+	std::unique_ptr<ResolveResult> Resolve(const Type& ptrType, const void* ptr) final
 	{
-		return ResolveResult();
+		return std::make_unique<ResolveResult>();
 	}
 
-	ResolveResult ResolveReverse(const Type& ptrType, const Type& dataType, std::uintptr_t* ptr, const void* dataValue) final
+	std::unique_ptr<ResolveResult> ResolveReverse(const Type& ptrType, const Type& dataType, std::uintptr_t* ptr, const void* dataValue) final
 	{
-		return ResolveResult();
+		return std::make_unique<ResolveResult>();
 	}
 };
 

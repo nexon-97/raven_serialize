@@ -48,7 +48,12 @@ std::type_index GetTypeIndexFromPointerType(void* value)
 	static_assert(std::is_pointer<T>::value, "Can't get type index from pointer type");
 
 	T ptrValue = *reinterpret_cast<T*>(value);
-	return typeid(*ptrValue);
+	if (nullptr != ptrValue)
+	{
+		return typeid(*ptrValue);
+	}
+	
+	return typeid(std::remove_pointer<T>::type);
 }
 
 template <typename T>

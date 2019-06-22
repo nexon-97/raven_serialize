@@ -292,10 +292,10 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 			auto resolveResult = resolver->Resolve(pointedType, pointedAddress);
 
-			if (resolveResult.resolved)
+			if (nullptr != resolveResult && resolveResult->resolved)
 			{
 				pointerResolved = true;
-				Write(resolveResult.resolvedType, resolveResult.resolvedValue);
+				Write(resolveResult->resolvedType, resolveResult->resolvedValue);
 			}
 		}
 
