@@ -13,6 +13,12 @@ const char* k_false = "false";
 const char* k_null = "null";
 const char* k_typeId = "$type$";
 const char* k_ptrClassKey = "$ptr_type$";
+const char* k_ptrTypeValue = "@ptr@";
+const char* k_smartptrTypeKey = "@smartptr@";
+const char* k_smartptrPointedTypeKey = "$smartptr_type$";
+const char* k_smartptrPointedValueKey = "ptr_value";
+const char* k_sharedPtrTypeName = "@shared_ptr@";
+const char* k_uniquePtrTypeName = "@unique_ptr@";
 const char k_stringParethesis = '"';
 
 }
@@ -22,34 +28,31 @@ JsonWriter::JsonWriter(std::ostream& stream, const bool prettyPrint)
 	, m_prettyPrint(prettyPrint)
 {}
 
-template <typename T>
-void Write(const T& value)
-{
-	Write(rttr::Reflect<T>(), &value);
-}
-
 void JsonWriter::Write(const rttr::Type& type, const void* value)
 {
+	Json::Value& jsonValue = *m_jsonStack.top();
+
 	if (nullptr == value)
 	{
-		m_stream << k_null;
+		jsonValue = Json::Value(Json::nullValue);
 	}
 	else if (type.GetTypeIndex() == typeid(bool))
 	{
 		bool boolValue = *static_cast<const bool*>(value);
-		m_stream << (boolValue ? k_true : k_false);
+		jsonValue = Json::Value(boolValue);
 	}
 	else if (type.IsString())
 	{
 		if (type.GetTypeIndex() == typeid(std::string))
 		{
 			const std::string* stringPtr = reinterpret_cast<const std::string*>(value);
-			WriteStringLiteral(stringPtr->c_str());
+			jsonValue = Json::Value(*stringPtr);
 		}
 		else if (type.GetTypeIndex() == typeid(std::wstring))
 		{
 			const std::wstring* stringPtr = reinterpret_cast<const std::wstring*>(value);
-			WriteStringLiteral(stringPtr->c_str());
+			std::string utf8String = WStringToUtf8(stringPtr->c_str());
+			jsonValue = Json::Value(utf8String);
 		}
 		else if (type.GetTypeIndex() == typeid(const char*))
 		{
@@ -58,11 +61,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 			if (nullptr == cStringVal)
 			{
-				m_stream << k_null;
+				jsonValue = Json::Value(Json::nullValue);
 			}
 			else
 			{
-				WriteStringLiteral(cStringVal);
+				jsonValue = Json::Value(cStringVal);
 			}
 		}
 	}
@@ -71,12 +74,12 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		if (type.IsSigned())
 		{
 			int64_t intValue = type.CastToSignedInteger(value);
-			m_stream << intValue;
+			jsonValue = Json::Value(intValue);
 		}
 		else
 		{
 			uint64_t intValue = type.CastToUnsignedInteger(value);
-			m_stream << intValue;
+			jsonValue = Json::Value(intValue);
 		}
 	}
 	else if (type.IsSmartPointer())
@@ -84,7 +87,14 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		auto pointerType = type.GetUnderlyingType(0U);
 		void* smartPtrValue = type.GetSmartPtrValue(const_cast<void*>(value));
 
+		jsonValue = Json::Value(Json::objectValue);
+		jsonValue[k_typeId] = k_smartptrTypeKey;
+		jsonValue[k_smartptrPointedTypeKey] = pointerType.GetName();
+		jsonValue[k_smartptrPointedValueKey] = Json::Value();
+	
+		m_jsonStack.push(&jsonValue[k_smartptrPointedValueKey]);
 		Write(pointerType, &smartPtrValue);
+		m_jsonStack.pop();
 	}
 	else if (type.IsEnum())
 	{
@@ -94,42 +104,26 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 	else if (type.IsFloatingPoint())
 	{
 		double floatValue = type.CastToFloat(value);
-		m_stream << floatValue;
+		jsonValue = Json::Value(floatValue);
 	}
 	else if (type.IsArray())
 	{
-		m_stream << '[';
-
-		if (m_prettyPrint)
-		{
-			m_stream << std::endl;
-		}
-		++m_padding;
+		jsonValue = Json::Value(Json::arrayValue);
 
 		if (type.IsDynamicArray())
 		{
 			std::size_t arraySize = type.GetDynamicArraySize(value);
 
-			auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
+			auto f = [this, arraySize, &jsonValue](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
 			{
-				if (m_prettyPrint)
-				{
-					PrintPadding();
-				}
+				Json::Value itemJson;
 
+				m_jsonStack.push(&itemJson);
 				Write(itemType, itemPtr);
+				m_jsonStack.pop();
 
-				if (index + 1U < arraySize)
-				{
-					m_stream.put(',');
-				}
-
-				if (m_prettyPrint)
-				{
-					m_stream << std::endl;
-				}
+				jsonValue.append(itemJson);
 			};
-
 			type.IterateArray(value, f);
 		}
 		else
@@ -138,129 +132,51 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			{
 				std::size_t arraySize = type.GetArrayExtent(dim);
 
-				auto f = [this, arraySize](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
+				auto f = [this, arraySize, &jsonValue](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
 				{
-					if (m_prettyPrint)
-					{
-						PrintPadding();
-					}
+					Json::Value itemJson;
 
+					m_jsonStack.push(&itemJson);
 					Write(itemType, itemPtr);
+					m_jsonStack.pop();
 
-					if (index + 1U < arraySize)
-					{
-						m_stream.put(',');
-
-					}
-
-					if (m_prettyPrint)
-					{
-						m_stream << std::endl;
-					}
+					jsonValue.append(itemJson);
 				};
 
 				type.IterateArray(value, f);
 			}
 		}
-
-		--m_padding;
-
-		if (m_prettyPrint)
-		{
-			PrintPadding();
-		}
-
-		m_stream << ']';
 	}
 	else if (type.IsClass())
 	{
-		m_stream << '{';
-		if (m_prettyPrint)
-		{
-			m_stream << std::endl;
-		}
-		++m_padding;
+		jsonValue = Json::Value(Json::objectValue);
 
 		std::size_t propertiesCount = type.GetPropertiesCount();
 
 		// Write metaclass names
-		{
-			if (m_prettyPrint)
-			{
-				PrintPadding();
-			}
-
-			WriteStringLiteral(k_typeId);
-			if (m_prettyPrint)
-			{
-				m_stream << " : ";
-			}
-			else
-			{
-				m_stream << ':';
-			}
-			WriteStringLiteral(type.GetName());
-
-			if (propertiesCount > 0U)
-			{
-				m_stream << ',';
-			}
-
-			if (m_prettyPrint)
-			{
-				m_stream << std::endl;
-			}
-		}
+		jsonValue[k_typeId] = type.GetName();
 
 		for (std::size_t i = 0U; i < propertiesCount; ++i)
 		{
 			auto property = type.GetProperty(i);
 			const rttr::Type& propertyType = property->GetType();
 
-			if (m_prettyPrint)
-			{
-				PrintPadding();
-			}
-
-			WriteStringLiteral(property->GetName());
-			if (m_prettyPrint)
-			{
-				m_stream << " : ";
-			}
-			else
-			{
-				m_stream << ':';
-			}
+			const char* propertyName = property->GetName();
+			jsonValue[propertyName] = Json::Value();
+			m_jsonStack.push(&jsonValue[propertyName]);
 
 			void* valuePtr = nullptr;
 			bool needRelease = false;
 			property->GetValue(value, valuePtr, needRelease);
 
 			Write(propertyType, valuePtr);
+			m_jsonStack.pop();
 
 			if (needRelease)
 			{
 				delete valuePtr;
 			}
-
-			if (i + 1U < propertiesCount)
-			{
-				m_stream.put(',');
-			}
-
-			if (m_prettyPrint)
-			{
-				m_stream << std::endl;
-			}
 		}
-
-		--m_padding;
-		if (m_prettyPrint)
-		{
-			PrintPadding();
-		}
-		
-		m_stream << '}';
 	}
 	else if (type.IsPointer())
 	{
@@ -301,83 +217,35 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 		if (!pointerResolved)
 		{
-			const char* typeName = nullptr;
-
 			// No resolver found, so put null here
-			rttr::Type metaType = rttr::Reflect(pointerTypeIndex);
-			if (metaType.IsValid())
+			rttr::Type pointedMetaType = rttr::Reflect(pointerTypeIndex);
+			if (pointedMetaType.IsValid())
 			{
-				typeName = metaType.GetName();
+				const char* typeName = pointedMetaType.GetName();
+
+				jsonValue = Json::Value(Json::objectValue);
+				jsonValue[k_typeId] = k_ptrTypeValue;
+				jsonValue[k_ptrClassKey] = typeName;
 			}
 			else
 			{
-				typeName = pointerTypeIndex.name();
+				jsonValue = Json::Value(Json::nullValue);
 			}
-
-			m_stream << '{';
-			if (m_prettyPrint)
-			{
-				m_stream << std::endl;
-			}
-			++m_padding;
-
-			PrintPadding();
-			WriteKeyValue(k_typeId, "ptr");
-			m_stream << ',' << std::endl;
-			PrintPadding();
-			WriteKeyValue(k_ptrClassKey, typeName);
-
-			--m_padding;
-			if (m_prettyPrint)
-			{
-				m_stream << std::endl;
-				PrintPadding();
-			}
-			m_stream << '}';
 		}
 	}
 	else
 	{
 		// This type of meta-type is not supported?
-		m_stream << k_null;
+		jsonValue = Json::Value(Json::nullValue);
 	}
 }
 
-void JsonWriter::PrintPadding()
-{
-	for (int pad = 0; pad < m_padding; ++pad)
-	{
-		m_stream.put('\t');
-	}
-}
-
-void JsonWriter::WriteStringLiteral(const char* _literal)
-{
-	m_stream << k_stringParethesis << _literal << k_stringParethesis;
-}
-
-void JsonWriter::WriteStringLiteral(const wchar_t* _literal)
+std::string JsonWriter::WStringToUtf8(const wchar_t* _literal)
 {
 	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 	std::string utf8String = converter.to_bytes(_literal);
 
-	m_stream.put(k_stringParethesis);
-	m_stream.write(utf8String.data(), utf8String.size());
-	m_stream.put(k_stringParethesis);
-}
-
-void JsonWriter::WriteKeyValue(const char* key, const char* value)
-{
-	WriteStringLiteral(key);
-	if (m_prettyPrint)
-	{
-		m_stream << " : ";
-	}
-	else
-	{
-		m_stream << ':';
-	}
-	WriteStringLiteral(value);
+	return utf8String;
 }
 
 void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)
