@@ -130,8 +130,12 @@ struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
 {
 	SmartPointerTraitsResolver(type_data& metaTypeData)
 	{
+		static SmartPtrParams smartptrParams;
+		smartptrParams.smartptrTypeName = smart_ptr_type_name_resolver<T>()();
+
 		metaTypeData.underlyingType[0] = new Type(Reflect<smart_ptr_type<T>::type>());
 		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
+		metaTypeData.smartptrParams = &smartptrParams;
 	}
 };
 
@@ -171,6 +175,8 @@ class Manager
 public:
 	Manager() = default;
 	~Manager() = default;
+
+	void Init();
 
 	template <typename T, typename AllocatorT = DefaultInstanceAllocator<T>>
 	Type RegisterMetaType(const char* name, AllocatorT allocator, const bool userDefined)
@@ -273,6 +279,8 @@ private:
 	std::unordered_map<std::string, type_data*> m_typeNames;
 	std::size_t m_nextId = 0U;
 };
+
+void RAVEN_SER_API InitRavenSerialization();
 
 template <typename T>
 Type MetaType(const char* name)

@@ -20,6 +20,11 @@ using MetaTypeInstanceAllocator = std::function<void*()>;
 using PointerTypeIndexResolverFunc = std::function<std::type_index(void*)>;
 using SmartPtrValueResolver = std::function<void* (void*)>;
 
+struct SmartPtrParams
+{
+	const char* smartptrTypeName;
+};
+
 struct type_data
 {
 	const char* name = nullptr;
@@ -47,6 +52,7 @@ struct type_data
 		bool isStdArray = false;
 		bool isSimpleArray = false;
 	} arrayTraits;
+	SmartPtrParams* smartptrParams = nullptr;
 	Type* underlyingType[2];
 	std::shared_ptr<std::size_t> arrayExtents;
 	std::vector<std::shared_ptr<Property>> properties;
@@ -98,6 +104,7 @@ public:
 	RAVEN_SER_API void* Instantiate() const;
 	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
 	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
+	RAVEN_SER_API const char* GetSmartPtrTypeName() const;
 
 	bool RAVEN_SER_API operator==(const Type& other) const;
 	bool RAVEN_SER_API operator!=(const Type& other) const;

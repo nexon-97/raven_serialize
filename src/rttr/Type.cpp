@@ -300,6 +300,12 @@ std::type_index Type::GetPointerTypeIndex(void* value) const
 	return m_typeData->pointerTypeIndexResolverFunc(value);
 }
 
+const char* Type::GetSmartPtrTypeName() const
+{
+	assert(IsSmartPointer());
+	return m_typeData->smartptrParams->smartptrTypeName;
+}
+
 bool Type::operator==(const Type& other) const
 {
 	return m_typeData == other.m_typeData;

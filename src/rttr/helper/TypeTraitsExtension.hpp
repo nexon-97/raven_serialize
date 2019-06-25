@@ -72,6 +72,27 @@ struct smart_ptr_type<std::unique_ptr<T>>
 };
 
 template <typename>
+struct smart_ptr_type_name_resolver {};
+
+template <typename T>
+struct smart_ptr_type_name_resolver<std::shared_ptr<T>>
+{
+	const char* operator()()
+	{
+		return "shared_ptr";
+	}
+};
+
+template <typename T>
+struct smart_ptr_type_name_resolver<std::unique_ptr<T>>
+{
+	const char* operator()()
+	{
+		return "unique_ptr";
+	}
+};
+
+template <typename>
 struct is_shared_ptr : std::false_type {};
 
 template <typename T>

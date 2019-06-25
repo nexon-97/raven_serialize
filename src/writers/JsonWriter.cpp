@@ -12,13 +12,18 @@ const char* k_true = "true";
 const char* k_false = "false";
 const char* k_null = "null";
 const char* k_typeId = "$type$";
+const char* k_sysTypeId = "$sys_type$";
 const char* k_ptrClassKey = "$ptr_type$";
+const char* k_ptrMarkerKey = "$marker_id$";
 const char* k_ptrTypeValue = "@ptr@";
 const char* k_smartptrTypeKey = "@smartptr@";
-const char* k_smartptrPointedTypeKey = "$smartptr_type$";
+const char* k_smartptrTypeSpecializationKey = "$smartptr_type$";
+const char* k_smartptrUnderlyingTypeKey = "$smartptr_sub_type$";
 const char* k_smartptrPointedValueKey = "ptr_value";
 const char* k_sharedPtrTypeName = "@shared_ptr@";
 const char* k_uniquePtrTypeName = "@unique_ptr@";
+const char* k_contextTypeName = "@context@";
+const char* k_contextObjectsKey = "$objects$";
 const char k_stringParethesis = '"';
 
 }
@@ -89,9 +94,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 		jsonValue = Json::Value(Json::objectValue);
 		jsonValue[k_typeId] = k_smartptrTypeKey;
-		jsonValue[k_smartptrPointedTypeKey] = pointerType.GetName();
+		jsonValue[k_smartptrTypeSpecializationKey] = type.GetSmartPtrTypeName();
 		jsonValue[k_smartptrPointedValueKey] = Json::Value();
-	
+		jsonValue[k_smartptrUnderlyingTypeKey] = pointerType.GetName();
+		jsonValue[k_sysTypeId] = type.GetName();
+		
 		m_jsonStack.push(&jsonValue[k_smartptrPointedValueKey]);
 		Write(pointerType, &smartPtrValue);
 		m_jsonStack.pop();
@@ -162,13 +169,13 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			const rttr::Type& propertyType = property->GetType();
 
 			const char* propertyName = property->GetName();
-			jsonValue[propertyName] = Json::Value();
-			m_jsonStack.push(&jsonValue[propertyName]);
-
+			
 			void* valuePtr = nullptr;
 			bool needRelease = false;
 			property->GetValue(value, valuePtr, needRelease);
 
+			jsonValue[propertyName] = Json::Value();
+			m_jsonStack.push(&jsonValue[propertyName]);
 			Write(propertyType, valuePtr);
 			m_jsonStack.pop();
 
@@ -197,6 +204,7 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			// Try default resolver
 		}
 
+		std::unique_ptr<rttr::PointerTypeResolver::ResolveResult> resolveResult;
 		if (nullptr != resolver)
 		{
 			// Convert address to variable to pointer-to-pointer
@@ -206,26 +214,33 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			// Interpret resolved pointer value as new pointer to void
 			const void* pointedAddress = reinterpret_cast<const void*>(pointerValue);
 
-			auto resolveResult = resolver->Resolve(pointedType, pointedAddress);
+			resolveResult = resolver->Resolve(pointedType, pointedAddress);
 
 			if (nullptr != resolveResult && resolveResult->resolved)
 			{
 				pointerResolved = true;
 				Write(resolveResult->resolvedType, resolveResult->resolvedValue);
 			}
+			else
+			{
+				// Custom resolver didn't resolve the pointer, so put null here
+				jsonValue = Json::Value(Json::nullValue);
+				return;
+			}
 		}
 
 		if (!pointerResolved)
 		{
-			// No resolver found, so put null here
+			// Pointers can have no custom resolvers, so must serialize them using serialization context
 			rttr::Type pointedMetaType = rttr::Reflect(pointerTypeIndex);
 			if (pointedMetaType.IsValid())
 			{
-				const char* typeName = pointedMetaType.GetName();
+				CreateSerializationContext();
 
+				std::size_t objectId = m_context->AddObject(pointedMetaType, value);
 				jsonValue = Json::Value(Json::objectValue);
-				jsonValue[k_typeId] = k_ptrTypeValue;
-				jsonValue[k_ptrClassKey] = typeName;
+				jsonValue[k_typeId] = type.GetName();
+				jsonValue[k_ptrMarkerKey] = objectId;
 			}
 			else
 			{
@@ -251,4 +266,69 @@ std::string JsonWriter::WStringToUtf8(const wchar_t* _literal)
 void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)
 {
 	m_customPointerTypeResolvers.emplace(type.GetTypeIndex(), resolver);
+}
+
+void JsonWriter::CreateSerializationContext()
+{
+	if (nullptr == m_context)
+	{
+		m_context = std::make_unique<rs::detail::SerializationContext>();
+		m_isUsingPointerContext = true;
+	}
+}
+
+void JsonWriter::DoWrite()
+{
+	Json::Value& serializedValue = m_jsonRoot;
+
+	GenerateSerializationContextValues();
+
+	if (!m_serializedObjects.empty())
+	{
+		Json::Value contextWrapper(Json::objectValue);
+		contextWrapper[k_typeId] = k_contextTypeName;
+		contextWrapper[k_contextObjectsKey] = Json::Value(Json::arrayValue);
+		Json::Value& objectsValue = contextWrapper[k_contextObjectsKey];
+
+		objectsValue.append(m_jsonRoot);
+		for (const auto& item : m_serializedObjects)
+		{
+			objectsValue.append(item);
+		}
+
+		serializedValue = contextWrapper;
+	}
+
+	Json::StreamWriterBuilder writerBuilder;
+
+	if (m_prettyPrint)
+	{
+		writerBuilder["indentation"] = "\t";
+	}
+	else
+	{
+		writerBuilder["indentation"] = "";
+	}
+
+	Json::StreamWriter* jsonWriter = writerBuilder.newStreamWriter();
+	jsonWriter->write(serializedValue, &m_stream);
+}
+
+void JsonWriter::GenerateSerializationContextValues()
+{
+	if (nullptr == m_context)
+		return;
+
+	m_serializedObjects.clear();
+	for (const auto& contextValue : m_context->GetObjects())
+	{
+		m_serializedObjects.emplace_back(Json::objectValue);
+		Json::Value& jsonValue = m_serializedObjects.back();
+
+		m_jsonStack.push(&jsonValue);
+		Write(contextValue.type, contextValue.objectPtr);
+		m_jsonStack.pop();
+
+		jsonValue[k_ptrMarkerKey] = contextValue.objectId;
+	}
 }

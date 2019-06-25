@@ -1,11 +1,17 @@
 #include "rttr/Manager.hpp"
+#include "SerializationContext.hpp"
 
 namespace rttr
 {
 
+void InitRavenSerialization()
+{
+	MetaType<rs::detail::SerializationContext>("@context@");
+}
+
 Manager& Manager::GetRTTRManager()
 {
-	static Manager s_manager;
+	static Manager s_manager;	
 	return s_manager;
 }
 
