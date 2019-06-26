@@ -215,17 +215,16 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			const void* pointedAddress = reinterpret_cast<const void*>(pointerValue);
 
 			resolveResult = resolver->Resolve(pointedType, pointedAddress);
+			pointerResolved = true;
 
 			if (nullptr != resolveResult && resolveResult->resolved)
 			{
-				pointerResolved = true;
 				Write(resolveResult->resolvedType, resolveResult->resolvedValue);
 			}
 			else
 			{
 				// Custom resolver didn't resolve the pointer, so put null here
 				jsonValue = Json::Value(Json::nullValue);
-				return;
 			}
 		}
 
@@ -237,7 +236,8 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			{
 				CreateSerializationContext();
 
-				std::size_t objectId = m_context->AddObject(pointedMetaType, value);
+				const void* const* ptrToValue = reinterpret_cast<const void* const*>(value);
+				std::size_t objectId = m_context->AddObject(pointedMetaType, *ptrToValue);
 				jsonValue = Json::Value(Json::objectValue);
 				jsonValue[k_typeId] = type.GetName();
 				jsonValue[k_ptrMarkerKey] = objectId;
@@ -250,7 +250,7 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 	}
 	else
 	{
-		// This type of meta-type is not supported?
+		// This type is not supported?
 		jsonValue = Json::Value(Json::nullValue);
 	}
 }

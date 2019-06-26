@@ -106,30 +106,73 @@ struct is_unique_ptr<std::unique_ptr<T>> : std::true_type {};
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-template <typename SignatureType, typename T, typename ValueType>
-void ApplySignature(SignatureType signature, T* object, const ValueType& value)
-{
-	static_assert(false, "Cannot apply signature!");
-}
+template <typename>
+struct ApplySignatureT {};
 
 template <typename T, typename ValueType>
-void ApplySignature(MemberSignature<T, ValueType> signature, T* object, const ValueType& value)
+struct ApplySignatureT<MemberSignature<T, ValueType>>
 {
-	object->*signature = value;
-}
+	using SignatureT = MemberSignature<T, ValueType>;
+	SignatureT m_signature;
 
-//MutatorMethod<T, ValueType>
-template <typename T, typename ValueType>
-void ApplySignature(MutatorMethod<T, ValueType> signature, T* object, const ValueType& value)
+	ApplySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	void operator()(T* object, const ValueType& value)
+	{
+		object->*m_signature = value;
+	}
+};
+
+template <typename T, typename ValueType, std::size_t N>
+struct ApplySignatureT<MemberSignature<T, ValueType[N]>>
 {
-	std::invoke(signature, object, value);
-}
+	using SignatureT = MemberSignature<T, ValueType[N]>;
+	SignatureT m_signature;
+
+	ApplySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	void operator()(T* object, const ValueType* value)
+	{
+		void* memberPtr = object->*m_signature;
+		std::memcpy(memberPtr, value, sizeof(ValueType) * N);
+	}
+};
 
 template <typename T, typename ValueType>
-void ApplySignature(MutatorMethodByValue<T, ValueType> signature, T* object, const ValueType& value)
+struct ApplySignatureT<MutatorMethod<T, ValueType>>
 {
-	std::invoke(signature, object, value);
-}
+	using SignatureT = MutatorMethod<T, ValueType>;
+	SignatureT m_signature;
+
+	ApplySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	void operator()(T* object, const ValueType& value)
+	{
+		std::invoke(m_signature, object, value);
+	}
+};
+
+template <typename T, typename ValueType>
+struct ApplySignatureT<MutatorMethodByValue<T, ValueType>>
+{
+	using SignatureT = MutatorMethodByValue<T, ValueType>;
+	SignatureT m_signature;
+
+	ApplySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	void operator()(T* object, ValueType value)
+	{
+		std::invoke(m_signature, object, value);
+	}
+};
 
 ///////////////////////////////////////////////////////////////////////////////////////
 

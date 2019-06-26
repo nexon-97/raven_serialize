@@ -106,7 +106,7 @@ struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 };
 
 template <typename T>
-struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value, T>>
+struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
 	{

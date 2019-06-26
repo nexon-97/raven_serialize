@@ -53,7 +53,8 @@ public:
 
 	void SetValue(ClassType* object, ValueType* value)
 	{
-		ApplySignature(m_signature, object, *value);
+		auto applicant = ApplySignatureT<SignatureType>(m_signature);
+		applicant(object, *value);
 	}
 
 	const ValueType& GetValue(const ClassType* object) const
@@ -98,7 +99,8 @@ public:
 
 	void SetValue(ClassType* object, ValueType* value)
 	{
-		ApplySignature(m_setterSignature, object, *value);
+		auto applicant = ApplySignatureT<SetterSignature>(m_setterSignature);
+		applicant(object, *value);
 	}
 
 	const ValueType& GetValue(const ClassType* object) const
