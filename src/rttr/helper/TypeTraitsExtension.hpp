@@ -79,7 +79,8 @@ struct smart_ptr_type_name_resolver<std::shared_ptr<T>>
 {
 	const char* operator()()
 	{
-		return "shared_ptr";
+		const char* k_sharedPtrTypeName = "shared_ptr";
+		return k_sharedPtrTypeName;
 	}
 };
 
@@ -88,7 +89,8 @@ struct smart_ptr_type_name_resolver<std::unique_ptr<T>>
 {
 	const char* operator()()
 	{
-		return "unique_ptr";
+		const char* k_uniquePtrTypeName = "unique_ptr";
+		return k_uniquePtrTypeName;
 	}
 };
 

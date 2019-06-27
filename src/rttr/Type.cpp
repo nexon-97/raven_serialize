@@ -240,7 +240,7 @@ std::size_t Type::GetDynamicArraySize(const void* value) const
 {
 	assert(IsArray());
 
-	if (m_typeData->arrayTraits.isStdArray)
+	if (m_typeData->arrayTraits.isStdVector)
 	{
 		auto vectorPtr = static_cast<const std::vector<uint8_t>*>(value);
 		std::size_t vectorByteSize = vectorPtr->size();
@@ -256,10 +256,11 @@ void Type::SetDynamicArraySize(void* value, const std::size_t count) const
 {
 	assert(IsArray());
 
-	if (m_typeData->arrayTraits.isStdArray)
+	if (m_typeData->arrayTraits.isStdVector)
 	{
-		auto vectorPtr = static_cast<std::vector<float>*>(value);
-		vectorPtr->resize(count);
+		auto vectorPtr = static_cast<std::vector<uint8_t>*>(value);
+		auto underlyingType = GetUnderlyingType();
+		vectorPtr->resize(underlyingType.GetSize() * count);
 	}
 }
 
@@ -267,11 +268,11 @@ void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
 {
 	assert(IsArray());
 
-	if (m_typeData->arrayTraits.isStdArray)
+	if (m_typeData->arrayTraits.isStdVector)
 	{
-		auto vectorPtr = static_cast<std::vector<float>*>(value);
+		auto vectorPtr = static_cast<std::vector<uint8_t>*>(value);
 		auto underlyingType = GetUnderlyingType();
-		return reinterpret_cast<uint8_t*>(vectorPtr->data()) + underlyingType.GetSize() * idx;
+		return vectorPtr->data() + underlyingType.GetSize() * idx;
 	}
 
 	return nullptr;

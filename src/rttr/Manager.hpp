@@ -97,7 +97,7 @@ struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 	ArrayDataResolver(type_data& metaTypeData)
 	{
 		metaTypeData.arrayRank = 1U;
-		metaTypeData.arrayTraits.isStdArray = true;
+		metaTypeData.arrayTraits.isStdVector = true;
 		metaTypeData.underlyingType[0] = new Type(Reflect<std_vector_type<T>::type>());
 
 		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);

@@ -33,31 +33,32 @@ JsonWriter::JsonWriter(std::ostream& stream, const bool prettyPrint)
 	, m_prettyPrint(prettyPrint)
 {}
 
-void JsonWriter::Write(const rttr::Type& type, const void* value)
+void JsonWriter::WriteObject(const rttr::Type& type, const void* value)
 {
-	Json::Value& jsonValue = *m_jsonStack.top();
-
 	if (nullptr == value)
 	{
-		jsonValue = Json::Value(Json::nullValue);
+		Json::Value& nullValue = CreateJsonObject(Json::nullValue);
 	}
 	else if (type.GetTypeIndex() == typeid(bool))
 	{
+		Json::Value& jsonBool = CreateJsonObject(Json::booleanValue);
 		bool boolValue = *static_cast<const bool*>(value);
-		jsonValue = Json::Value(boolValue);
+		jsonBool = Json::Value(boolValue);
 	}
 	else if (type.IsString())
 	{
+		Json::Value& jsonStr = CreateJsonObject(Json::stringValue);
+
 		if (type.GetTypeIndex() == typeid(std::string))
 		{
 			const std::string* stringPtr = reinterpret_cast<const std::string*>(value);
-			jsonValue = Json::Value(*stringPtr);
+			jsonStr = Json::Value(*stringPtr);
 		}
 		else if (type.GetTypeIndex() == typeid(std::wstring))
 		{
 			const std::wstring* stringPtr = reinterpret_cast<const std::wstring*>(value);
 			std::string utf8String = WStringToUtf8(stringPtr->c_str());
-			jsonValue = Json::Value(utf8String);
+			jsonStr = Json::Value(utf8String);
 		}
 		else if (type.GetTypeIndex() == typeid(const char*))
 		{
@@ -66,11 +67,11 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 			if (nullptr == cStringVal)
 			{
-				jsonValue = Json::Value(Json::nullValue);
+				jsonStr = Json::Value(Json::nullValue);
 			}
 			else
 			{
-				jsonValue = Json::Value(cStringVal);
+				jsonStr = Json::Value(cStringVal);
 			}
 		}
 	}
@@ -78,13 +79,15 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 	{
 		if (type.IsSigned())
 		{
+			Json::Value& jsonInt = CreateJsonObject(Json::intValue);
 			int64_t intValue = type.CastToSignedInteger(value);
-			jsonValue = Json::Value(intValue);
+			jsonInt = Json::Value(intValue);
 		}
 		else
 		{
-			uint64_t intValue = type.CastToUnsignedInteger(value);
-			jsonValue = Json::Value(intValue);
+			Json::Value& jsonUInt = CreateJsonObject(Json::intValue);
+			uint64_t uintValue = type.CastToUnsignedInteger(value);
+			jsonUInt = Json::Value(uintValue);
 		}
 	}
 	else if (type.IsSmartPointer())
@@ -92,76 +95,49 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 		auto pointerType = type.GetUnderlyingType(0U);
 		void* smartPtrValue = type.GetSmartPtrValue(const_cast<void*>(value));
 
-		jsonValue = Json::Value(Json::objectValue);
-		jsonValue[k_typeId] = k_smartptrTypeKey;
-		jsonValue[k_smartptrTypeSpecializationKey] = type.GetSmartPtrTypeName();
-		jsonValue[k_smartptrPointedValueKey] = Json::Value();
-		jsonValue[k_smartptrUnderlyingTypeKey] = pointerType.GetName();
-		jsonValue[k_sysTypeId] = type.GetName();
+		Json::Value& smartptrJsonValue = CreateJsonObject(Json::objectValue);
+		smartptrJsonValue[k_typeId] = k_smartptrTypeKey;
+		smartptrJsonValue[k_smartptrTypeSpecializationKey] = type.GetSmartPtrTypeName();
+		smartptrJsonValue[k_smartptrUnderlyingTypeKey] = pointerType.GetName();
+		smartptrJsonValue[k_sysTypeId] = type.GetName();
 		
-		m_jsonStack.push(&jsonValue[k_smartptrPointedValueKey]);
-		Write(pointerType, &smartPtrValue);
+		WriteObject(pointerType, &smartPtrValue);
+		smartptrJsonValue[k_smartptrPointedValueKey] = *m_jsonStack.top();
 		m_jsonStack.pop();
 	}
 	else if (type.IsEnum())
 	{
 		const rttr::Type& enumUnderlyingType = type.GetUnderlyingType(0U);
-		Write(enumUnderlyingType, value);
+		WriteObject(enumUnderlyingType, value);
 	}
 	else if (type.IsFloatingPoint())
 	{
+		Json::Value& jsonReal = CreateJsonObject(Json::realValue);
 		double floatValue = type.CastToFloat(value);
-		jsonValue = Json::Value(floatValue);
+		jsonReal = Json::Value(floatValue);
 	}
 	else if (type.IsArray())
 	{
-		jsonValue = Json::Value(Json::arrayValue);
-
 		if (type.IsDynamicArray())
 		{
 			std::size_t arraySize = type.GetDynamicArraySize(value);
-
-			auto f = [this, arraySize, &jsonValue](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
-			{
-				Json::Value itemJson;
-
-				m_jsonStack.push(&itemJson);
-				Write(itemType, itemPtr);
-				m_jsonStack.pop();
-
-				jsonValue.append(itemJson);
-			};
-			type.IterateArray(value, f);
+			void* itemsPointer = type.GetArrayItemValuePtr(const_cast<void*>(value), 0U);
+			WriteArray(type.GetUnderlyingType(0U), itemsPointer, arraySize);
 		}
 		else
 		{
-			for (std::size_t dim = 0U; dim < type.GetArrayRank(); ++dim)
-			{
-				std::size_t arraySize = type.GetArrayExtent(dim);
-
-				auto f = [this, arraySize, &jsonValue](const rttr::Type& itemType, std::size_t index, const void* itemPtr)
-				{
-					Json::Value itemJson;
-
-					m_jsonStack.push(&itemJson);
-					Write(itemType, itemPtr);
-					m_jsonStack.pop();
-
-					jsonValue.append(itemJson);
-				};
-
-				type.IterateArray(value, f);
-			}
+			std::size_t arraySize = type.GetArrayExtent(0U);
+			WriteArray(type.GetUnderlyingType(0U), value, arraySize);
 		}
 	}
 	else if (type.IsClass())
 	{
-		jsonValue = Json::Value(Json::objectValue);
+		Json::Value& jsonClass = CreateJsonObject(Json::objectValue);
 
 		std::size_t propertiesCount = type.GetPropertiesCount();
 
 		// Write metaclass names
-		jsonValue[k_typeId] = type.GetName();
+		jsonClass[k_typeId] = type.GetName();
 
 		for (std::size_t i = 0U; i < propertiesCount; ++i)
 		{
@@ -174,9 +150,8 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 			bool needRelease = false;
 			property->GetValue(value, valuePtr, needRelease);
 
-			jsonValue[propertyName] = Json::Value();
-			m_jsonStack.push(&jsonValue[propertyName]);
-			Write(propertyType, valuePtr);
+			WriteObject(propertyType, valuePtr);
+			jsonClass[propertyName] = *m_jsonStack.top();
 			m_jsonStack.pop();
 
 			if (needRelease)
@@ -219,12 +194,12 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 			if (nullptr != resolveResult && resolveResult->resolved)
 			{
-				Write(resolveResult->resolvedType, resolveResult->resolvedValue);
+				WriteObject(resolveResult->resolvedType, resolveResult->resolvedValue);
 			}
 			else
 			{
 				// Custom resolver didn't resolve the pointer, so put null here
-				jsonValue = Json::Value(Json::nullValue);
+				Json::Value& jsonNull = CreateJsonObject(Json::nullValue);
 			}
 		}
 
@@ -238,21 +213,54 @@ void JsonWriter::Write(const rttr::Type& type, const void* value)
 
 				const void* const* ptrToValue = reinterpret_cast<const void* const*>(value);
 				std::size_t objectId = m_context->AddObject(pointedMetaType, *ptrToValue);
-				jsonValue = Json::Value(Json::objectValue);
+				Json::Value& jsonValue = CreateJsonObject(Json::objectValue);
 				jsonValue[k_typeId] = type.GetName();
 				jsonValue[k_ptrMarkerKey] = objectId;
 			}
 			else
 			{
-				jsonValue = Json::Value(Json::nullValue);
+				Json::Value& jsonNull = CreateJsonObject(Json::nullValue);
 			}
 		}
 	}
 	else
 	{
 		// This type is not supported?
-		jsonValue = Json::Value(Json::nullValue);
+		Json::Value& jsonNull = CreateJsonObject(Json::nullValue);
 	}
+}
+
+void JsonWriter::WriteArray(const rttr::Type& itemType, const void* arrayStartPtr, const std::size_t size)
+{
+	// Create array json value to store the array
+	Json::Value& arrayValue = CreateJsonObject(Json::arrayValue);
+
+	const std::size_t itemSize = itemType.GetSize();
+	const uint8_t* arrayDataPtr = reinterpret_cast<const uint8_t*>(arrayStartPtr);
+	for (std::size_t i = 0U; i < size; ++i)
+	{
+		WriteObject(itemType, arrayDataPtr + itemSize * i);
+		Json::Value& itemValue = *m_jsonStack.top();
+		arrayValue.append(itemValue);
+
+		m_jsonStack.pop();
+	}
+}
+
+void JsonWriter::WriteCustomObject(CustomObjectWriterFunc* objectWritersPtr, const std::size_t writersCount)
+{
+	/*Json::Value& jsonValue = *m_jsonStack.top();
+	jsonValue = Json::Value(Json::objectValue);
+
+	for (std::size_t i = 0U; i < writersCount; ++i)
+	{
+		Json::Value& itemValue = CreateJsonObject(Json::nullValue);
+		CustomObjectWriterFunc& objectWriter = *(objectWritersPtr + i);
+		std::invoke(objectWriter, this);
+		m_jsonStack.pop();
+
+		jsonValue.append(std::move(itemValue));
+	}*/
 }
 
 std::string JsonWriter::WStringToUtf8(const wchar_t* _literal)
@@ -285,15 +293,15 @@ void JsonWriter::DoWrite()
 
 	if (!m_serializedObjects.empty())
 	{
-		Json::Value contextWrapper(Json::objectValue);
+		Json::Value contextWrapper = Json::Value(Json::objectValue);
 		contextWrapper[k_typeId] = k_contextTypeName;
 		contextWrapper[k_contextObjectsKey] = Json::Value(Json::arrayValue);
-		Json::Value& objectsValue = contextWrapper[k_contextObjectsKey];
+		Json::Value& contextObjects = contextWrapper[k_contextObjectsKey];
 
-		objectsValue.append(m_jsonRoot);
-		for (const auto& item : m_serializedObjects)
+		contextObjects.append(m_jsonRoot);
+		for (auto& item : m_serializedObjects)
 		{
-			objectsValue.append(item);
+			contextObjects.append(std::move(item));
 		}
 
 		serializedValue = contextWrapper;
@@ -322,13 +330,19 @@ void JsonWriter::GenerateSerializationContextValues()
 	m_serializedObjects.clear();
 	for (const auto& contextValue : m_context->GetObjects())
 	{
-		m_serializedObjects.emplace_back(Json::objectValue);
-		Json::Value& jsonValue = m_serializedObjects.back();
-
-		m_jsonStack.push(&jsonValue);
-		Write(contextValue.type, contextValue.objectPtr);
+		WriteObject(contextValue.type, contextValue.objectPtr);
+		Json::Value& objectJsonValue = *m_jsonStack.top();
+		objectJsonValue[k_ptrMarkerKey] = contextValue.objectId;
 		m_jsonStack.pop();
 
-		jsonValue[k_ptrMarkerKey] = contextValue.objectId;
+		m_serializedObjects.push_back(std::move(objectJsonValue));
 	}
+}
+
+Json::Value& JsonWriter::CreateJsonObject(const Json::ValueType valueType)
+{
+	m_contextObjects.emplace_back(std::make_unique<Json::Value>(valueType));
+	m_jsonStack.push(m_contextObjects.back().get());
+
+	return *m_contextObjects.back();
 }
