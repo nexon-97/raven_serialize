@@ -1,4 +1,5 @@
 #pragma once
+#include "readers/IReader.hpp"
 #include "rttr/Type.hpp"
 #include "rttr/PointerTypeResolver.hpp"
 
@@ -6,7 +7,11 @@
 #include <unordered_map>
 #include <json/json.h>
 
+namespace rs
+{
+
 class JsonReader
+	: public IReader
 {
 public:
 	explicit RAVEN_SER_API JsonReader(std::istream& stream);
@@ -17,12 +22,11 @@ public:
 		Read(rttr::Reflect<T>(), &value);
 	}
 
-	void RAVEN_SER_API Read(const rttr::Type& type, void* value);
-	RAVEN_SER_API void* Read(const rttr::Type& type);
+	void RAVEN_SER_API Read(const rttr::Type& type, void* value) final;
+	RAVEN_SER_API void* Read(const rttr::Type& type) final;
+	bool RAVEN_SER_API IsOk() const final;
 
-	bool RAVEN_SER_API IsOk() const;
-
-	void RAVEN_SER_API AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver);
+	void RAVEN_SER_API AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver) final;
 
 private:
 	void RAVEN_SER_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
@@ -34,3 +38,5 @@ private:
 	Json::Value m_jsonRoot;
 	bool m_isOk = false;
 };
+
+}

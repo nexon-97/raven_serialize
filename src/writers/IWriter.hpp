@@ -2,9 +2,14 @@
 #include "rttr/Type.hpp"
 #include "rttr/PointerTypeResolver.hpp"
 
+namespace rs
+{
+
 class IWriter
 {
 public:
+	virtual ~IWriter() = default;
+
 	virtual void AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver) = 0;
 
 	// Used to write single data object, given its meta-type and pointer to object
@@ -15,3 +20,5 @@ public:
 	using CustomObjectWriterFunc = std::function<void(IWriter*)>;
 	virtual void WriteCustomObject(CustomObjectWriterFunc* objectWritersPtr, const std::size_t writersCount) = 0;
 };
+
+} // namespace rs

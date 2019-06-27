@@ -1,4 +1,4 @@
-#include "writers/JsonReader.hpp"
+#include "readers/JsonReader.hpp"
 #include "rttr/Property.hpp"
 #include "rttr/PointerTypeResolver.hpp"
 #include "rttr/Manager.hpp"
@@ -7,6 +7,9 @@ namespace
 {
 const char* k_typeId = "$type$";
 }
+
+namespace rs
+{
 
 JsonReader::JsonReader(std::istream& stream)
 	: m_stream(stream)
@@ -220,31 +223,33 @@ rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
 {
 	switch (jsonVal.type())
 	{
-	case Json::ValueType::stringValue:
-		return rttr::Reflect<const char*>();
-	case Json::ValueType::booleanValue:
-		return rttr::Reflect<bool>();
-	case Json::ValueType::intValue:
-		return rttr::Reflect<int64_t>();
-	case Json::ValueType::uintValue:
-		return rttr::Reflect<uint64_t>();
-	case Json::ValueType::realValue:
-		return rttr::Reflect<double>();
-	case Json::ValueType::arrayValue:
-		return rttr::Reflect<nullptr_t>();
-	case Json::ValueType::objectValue:
-	{
-		if (jsonVal.isMember(k_typeId))
-		{
-			return rttr::Reflect(jsonVal[k_typeId].asCString());
-		}
-		else
-		{
+		case Json::ValueType::stringValue:
+			return rttr::Reflect<const char*>();
+		case Json::ValueType::booleanValue:
+			return rttr::Reflect<bool>();
+		case Json::ValueType::intValue:
+			return rttr::Reflect<int64_t>();
+		case Json::ValueType::uintValue:
+			return rttr::Reflect<uint64_t>();
+		case Json::ValueType::realValue:
+			return rttr::Reflect<double>();
+		case Json::ValueType::arrayValue:
 			return rttr::Reflect<nullptr_t>();
+		case Json::ValueType::objectValue:
+		{
+			if (jsonVal.isMember(k_typeId))
+			{
+				return rttr::Reflect(jsonVal[k_typeId].asCString());
+			}
+			else
+			{
+				return rttr::Reflect<nullptr_t>();
+			}
 		}
+		case Json::ValueType::nullValue:
+		default:
+			return rttr::Reflect<nullptr_t>();
 	}
-	case Json::ValueType::nullValue:
-	default:
-		return rttr::Reflect<nullptr_t>();
-	}
+}
+
 }

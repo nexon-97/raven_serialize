@@ -7,6 +7,9 @@
 #include <memory>
 #include <json/json.h>
 
+namespace rs
+{
+
 class JsonWriter
 	: public IWriter
 {
@@ -54,3 +57,5 @@ private:
 	const bool m_prettyPrint;
 	bool m_isUsingPointerContext = false;
 };
+
+} // namespace rs

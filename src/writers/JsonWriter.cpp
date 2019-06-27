@@ -28,6 +28,9 @@ const char k_stringParethesis = '"';
 
 }
 
+namespace rs
+{
+
 JsonWriter::JsonWriter(std::ostream& stream, const bool prettyPrint)
 	: m_stream(stream)
 	, m_prettyPrint(prettyPrint)
@@ -100,7 +103,7 @@ void JsonWriter::WriteObject(const rttr::Type& type, const void* value)
 		smartptrJsonValue[k_smartptrTypeSpecializationKey] = type.GetSmartPtrTypeName();
 		smartptrJsonValue[k_smartptrUnderlyingTypeKey] = pointerType.GetName();
 		smartptrJsonValue[k_sysTypeId] = type.GetName();
-		
+
 		WriteObject(pointerType, &smartPtrValue);
 		smartptrJsonValue[k_smartptrPointedValueKey] = *m_jsonStack.top();
 		m_jsonStack.pop();
@@ -145,7 +148,7 @@ void JsonWriter::WriteObject(const rttr::Type& type, const void* value)
 			const rttr::Type& propertyType = property->GetType();
 
 			const char* propertyName = property->GetName();
-			
+
 			void* valuePtr = nullptr;
 			bool needRelease = false;
 			property->GetValue(value, valuePtr, needRelease);
@@ -346,3 +349,5 @@ Json::Value& JsonWriter::CreateJsonObject(const Json::ValueType valueType)
 
 	return *m_contextObjects.back();
 }
+
+} // namespace rs
