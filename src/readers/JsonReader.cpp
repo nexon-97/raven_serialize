@@ -6,6 +6,8 @@
 namespace
 {
 const char* k_typeId = "$type$";
+const char* k_contextTypeName = "@context@";
+const char* k_contextObjectsKey = "$objects$";
 }
 
 namespace rs
@@ -28,20 +30,42 @@ JsonReader::JsonReader(std::istream& stream)
 
 	m_isOk = reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr);
 
+	if (!m_isOk)
+	{
+		m_stream.seekg(startOffset, std::ios::beg);
+	}
+
 	delete[] buffer;
+}
+
+void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
+{
+	std::string className = GetObjectClassName(m_jsonRoot);
+	if (className == k_contextTypeName)
+	{
+		m_context = std::make_unique<rs::detail::SerializationContext>();
+
+		// Parse context
+		const Json::Value& contextObjects = m_jsonRoot[k_contextObjectsKey];
+		for (const Json::Value& contextObject : contextObjects)
+		{
+			rttr::Type objectType = DeduceType(contextObject);
+			void* object = objectType.Instantiate();
+
+			ReadImpl(objectType, object, contextObject);
+
+			m_context->AddObject(objectType, object);
+		}
+	}
+	else
+	{
+		ReadImpl(type, value, m_jsonRoot);
+	}
 }
 
 void JsonReader::Read(const rttr::Type& type, void* value)
 {
-	ReadImpl(type, value, m_jsonRoot);
-}
-
-void* JsonReader::Read(const rttr::Type& type)
-{
-	void* value = type.Instantiate();
-	ReadImpl(type, value, m_jsonRoot);
-
-	return value;
+	//ReadImpl(type, value, jsonValue);
 }
 
 void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
@@ -58,16 +82,31 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 	}
 	else if (type.IsString())
 	{
-		const char* strValue = jsonVal.asCString();
-
-		if (type.GetTypeIndex() == typeid(std::string))
+		if (jsonVal.isNull())
 		{
-			*static_cast<std::string*>(value) = strValue;
+			if (type.GetTypeIndex() == typeid(std::string))
+			{
+				*static_cast<std::string*>(value) = std::string();
+			}
+			else if (type.GetTypeIndex() == typeid(const char*))
+			{
+				char** strSerializedValue = reinterpret_cast<char**>(value);
+				*strSerializedValue = nullptr;
+			}
 		}
-		else if (type.GetTypeIndex() == typeid(const char*))
+		else if (jsonVal.isString())
 		{
-			char** strSerializedValue = reinterpret_cast<char**>(value);
-			*strSerializedValue = const_cast<char*>(strValue);
+			const char* strValue = jsonVal.asCString();
+
+			if (type.GetTypeIndex() == typeid(std::string))
+			{
+				*static_cast<std::string*>(value) = strValue;
+			}
+			else if (type.GetTypeIndex() == typeid(const char*))
+			{
+				char** strSerializedValue = reinterpret_cast<char**>(value);
+				*strSerializedValue = const_cast<char*>(strValue);
+			}
 		}
 	}
 	else if (type.IsIntegral())
@@ -156,8 +195,9 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 		{
 			auto property = type.GetProperty(i);
 			const rttr::Type& propertyType = property->GetType();
+			const char* propertyName = property->GetName();
 
-			const auto& itemJsonVal = jsonVal[property->GetName()];
+			const auto& itemJsonVal = jsonVal[propertyName];
 
 			void* valuePtr = nullptr;
 			bool needRelease = false;
@@ -205,6 +245,11 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			// Convert address to variable to pointer-to-pointer
 			std::uintptr_t* pointerAddress = reinterpret_cast<std::uintptr_t*>(value);
 			auto resolveResult = resolver->ResolveReverse(pointedType, serializedValueType, pointerAddress, serializedValue);
+
+			if (resolveResult->resolved)
+			{
+				*reinterpret_cast<void**>(value) = const_cast<void*>(resolveResult->resolvedValue);
+			}
 		}
 	}
 }
@@ -217,6 +262,16 @@ bool JsonReader::IsOk() const
 void JsonReader::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)
 {
 	m_customPointerTypeResolvers.emplace(type.GetTypeIndex(), resolver);
+}
+
+std::string JsonReader::GetObjectClassName(const Json::Value& jsonVal) const
+{
+	if (jsonVal.isObject() && jsonVal.isMember(k_typeId))
+	{
+		return jsonVal[k_typeId].asString();
+	}
+
+	return std::string();
 }
 
 rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
