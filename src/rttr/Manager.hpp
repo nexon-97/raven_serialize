@@ -92,6 +92,27 @@ struct ArrayDataResolver
 };
 
 template <typename T>
+void StlCollectionResize(void* collectionPtr, const std::size_t size)
+{
+	T* collection = reinterpret_cast<T*>(collectionPtr);
+	collection->resize(size);
+}
+
+template <typename T>
+std::size_t GetStlCollectionSize(const void* collectionPtr)
+{
+	const T* collection = reinterpret_cast<const T*>(collectionPtr);
+	return collection->size();
+}
+
+template <typename T>
+void* GetStlCollectionItem(const void* collectionPtr, const std::size_t idx)
+{
+	const T* collection = reinterpret_cast<const T*>(collectionPtr);
+	return const_cast<void*>(reinterpret_cast<const void*>(collection->data() + idx));
+}
+
+template <typename T>
 struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
@@ -102,6 +123,13 @@ struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 
 		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
 		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
+
+		// Fill dynamic array params
+		static DynamicArrayParams dynamicArrayParams;
+		dynamicArrayParams.resizeFunc = StlCollectionResize<T>;
+		dynamicArrayParams.getSizeFunc = GetStlCollectionSize<T>;
+		dynamicArrayParams.getItemFunc = GetStlCollectionItem<T>;
+		metaTypeData.dynamicArrayParams = &dynamicArrayParams;
 	}
 };
 
@@ -170,6 +198,12 @@ struct EnumTraitsResolver<T, std::enable_if_t<std::is_enum<T>::value>>
 	}
 };
 
+template <typename T, typename Cond = void>
+struct TypeClassResolver
+{
+	TypeClass operator()() { return TypeClass::Invalid; }
+};
+
 class Manager
 {
 public:
@@ -187,7 +221,7 @@ public:
 		if (it == m_types.end())
 		{
 			const char* typeName = (nullptr != name) ? name : typeid(T).name();
-			type_data i_metaTypeData(typeName, m_nextId, sizeof(T), typeid(T));
+			type_data i_metaTypeData(TypeClassResolver<T>()(), typeName, m_nextId, sizeof(T), typeid(T));
 			++m_nextId;
 
 			auto emplaceResult = m_types.emplace(typeid(T), i_metaTypeData);

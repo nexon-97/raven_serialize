@@ -25,8 +25,33 @@ struct SmartPtrParams
 	const char* smartptrTypeName;
 };
 
+struct DynamicArrayParams
+{
+	using ArrayResizeFunc = std::function<void(void*, const std::size_t)>;
+	using ArrayGetSizeFunc = std::function<std::size_t(const void*)>;
+	using ArrayGetItemFunc = std::function<void*(const void*, const std::size_t)>;
+
+	ArrayResizeFunc resizeFunc;
+	ArrayGetSizeFunc getSizeFunc;
+	ArrayGetItemFunc getItemFunc;
+};
+
+enum class TypeClass
+{
+	Invalid,
+
+	Integral,
+	Real,
+	Array,
+	Enum,
+	Function,
+	Pointer,
+	SmartPointer,
+};
+
 struct type_data
 {
+	const TypeClass typeClass;
 	const char* name = nullptr;
 	const std::size_t id = 0U;
 	const std::size_t size = 0U;
@@ -53,6 +78,7 @@ struct type_data
 		bool isSimpleArray = false;
 	} arrayTraits;
 	SmartPtrParams* smartptrParams = nullptr;
+	DynamicArrayParams* dynamicArrayParams = nullptr;
 	Type* underlyingType[2];
 	std::shared_ptr<std::size_t> arrayExtents;
 	std::vector<std::shared_ptr<Property>> properties;
@@ -60,7 +86,8 @@ struct type_data
 	PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
 	SmartPtrValueResolver smartPtrValueResolver;
 
-	RAVEN_SER_API type_data(const char* name, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept;
+	RAVEN_SER_API type_data(const TypeClass typeClass, const char* name
+		, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept;
 };
 
 class Type

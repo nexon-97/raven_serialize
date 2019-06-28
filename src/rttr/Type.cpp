@@ -4,13 +4,15 @@
 namespace rttr
 {
 
-type_data::type_data(const char* name, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept
+type_data::type_data(const TypeClass typeClass, const char* name
+	, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept
 	: name(name)
 	, id(id)
 	, size(size)
 	, typeIndex(typeIndex)
 	, underlyingType{ nullptr }
 	, isUserDefined(false)
+	, typeClass(typeClass)
 {}
 
 Type::Type(type_data* typeData)
@@ -239,43 +241,19 @@ const Type& Type::GetUnderlyingType(const std::size_t index) const
 std::size_t Type::GetDynamicArraySize(const void* value) const
 {
 	assert(IsArray());
-
-	if (m_typeData->arrayTraits.isStdVector)
-	{
-		auto vectorPtr = static_cast<const std::vector<uint8_t>*>(value);
-		std::size_t vectorByteSize = vectorPtr->size();
-		std::size_t vectorElementsCount = vectorByteSize / m_typeData->underlyingType[0]->GetSize();
-		
-		return vectorElementsCount;
-	}
-
-	return 0U;
+	return m_typeData->dynamicArrayParams->getSizeFunc(value);
 }
 
 void Type::SetDynamicArraySize(void* value, const std::size_t count) const
 {
 	assert(IsArray());
-
-	if (m_typeData->arrayTraits.isStdVector)
-	{
-		auto vectorPtr = static_cast<std::vector<uint8_t>*>(value);
-		auto underlyingType = GetUnderlyingType();
-		vectorPtr->resize(underlyingType.GetSize() * count);
-	}
+	m_typeData->dynamicArrayParams->resizeFunc(value, count);
 }
 
 void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
 {
 	assert(IsArray());
-
-	if (m_typeData->arrayTraits.isStdVector)
-	{
-		auto vectorPtr = static_cast<std::vector<uint8_t>*>(value);
-		auto underlyingType = GetUnderlyingType();
-		return vectorPtr->data() + underlyingType.GetSize() * idx;
-	}
-
-	return nullptr;
+	return m_typeData->dynamicArrayParams->getItemFunc(value, idx);
 }
 
 void* Type::Instantiate() const
