@@ -19,10 +19,12 @@ class Type;
 using MetaTypeInstanceAllocator = std::function<void*()>;
 using PointerTypeIndexResolverFunc = std::function<std::type_index(void*)>;
 using SmartPtrValueResolver = std::function<void* (void*)>;
+using SmartPtrValueAssignFunc = std::function<void(void*, void*)>;
 
 struct SmartPtrParams
 {
 	const char* smartptrTypeName;
+	SmartPtrValueAssignFunc valueAssignFunc;
 };
 
 struct DynamicArrayParams
@@ -48,6 +50,8 @@ enum class TypeClass
 	Pointer,
 	SmartPointer,
 };
+
+using DebugValueViewer = const void* (*)(const void*);
 
 struct type_data
 {
@@ -85,6 +89,7 @@ struct type_data
 	MetaTypeInstanceAllocator instanceAllocator;
 	PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
 	SmartPtrValueResolver smartPtrValueResolver;
+	DebugValueViewer debugValueViewer = nullptr;
 
 	RAVEN_SER_API type_data(const TypeClass typeClass, const char* name
 		, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept;
@@ -132,6 +137,7 @@ public:
 	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
 	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
 	RAVEN_SER_API const char* GetSmartPtrTypeName() const;
+	void RAVEN_SER_API AssignPointerValue(void* pointer, void* value) const;
 
 	bool RAVEN_SER_API operator==(const Type& other) const;
 	bool RAVEN_SER_API operator!=(const Type& other) const;
@@ -167,6 +173,8 @@ public:
 	uint64_t RAVEN_SER_API CastToUnsignedInteger(const void* value) const;
 	int64_t RAVEN_SER_API CastToSignedInteger(const void* value) const;
 	double RAVEN_SER_API CastToFloat(const void* value) const;
+
+	RAVEN_SER_API const void* DebugViewValue(const void* value) const;
 
 private:
 	void RAVEN_SER_API AddProperty(std::shared_ptr<Property>&& property);

@@ -11,6 +11,12 @@ SerializationContext::ObjectData::ObjectData(const rttr::Type& type, const void*
 	, objectId(objectId)
 {}
 
+SerializationContext::PointerToFillData::PointerToFillData(const rttr::Type& type, const std::size_t objectId, void* pointerAddress) noexcept
+	: type(type)
+	, objectId(objectId)
+	, pointerAddress(pointerAddress)
+{}
+
 std::size_t SerializationContext::AddObject(const rttr::Type& type, const void* objectPtr)
 {
 	auto predicate = [&type, objectPtr](const ObjectData& data)
@@ -35,6 +41,11 @@ std::size_t SerializationContext::AddObject(const rttr::Type& type, const void* 
 	}
 }
 
+void SerializationContext::AddPointerToFill(const rttr::Type& type, const std::size_t objectId, void* pointerAddress)
+{
+	m_pointersToFill.emplace_back(type, objectId, pointerAddress);
+}
+
 SerializationContext::ObjectData* SerializationContext::GetObjectById(const std::size_t id)
 {
 	auto predicate = [id](const ObjectData& data)
@@ -55,6 +66,11 @@ SerializationContext::ObjectData* SerializationContext::GetObjectById(const std:
 const std::vector<SerializationContext::ObjectData>& SerializationContext::GetObjects() const
 {
 	return m_objects;
+}
+
+const std::vector<SerializationContext::PointerToFillData>& SerializationContext::GetPointersToFill() const
+{
+	return m_pointersToFill;
 }
 
 } // namespace detail

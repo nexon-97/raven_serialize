@@ -1,7 +1,7 @@
 #pragma once
 #include "readers/IReader.hpp"
 #include "rttr/Type.hpp"
-#include "rttr/PointerTypeResolver.hpp"
+#include "rttr/CustomTypeResolver.hpp"
 #include "SerializationContext.hpp"
 
 #include <istream>
@@ -26,7 +26,7 @@ public:
 	void RAVEN_SER_API Read(const rttr::Type& type, void* value) final;
 	bool RAVEN_SER_API IsOk() const final;
 
-	void RAVEN_SER_API AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver) final;
+	void RAVEN_SER_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
 private:
 	void RAVEN_SER_API ReadObjectWithContext(const rttr::Type& type, void* value);
@@ -36,7 +36,7 @@ private:
 
 private:
 	std::istream& m_stream;
-	std::unordered_map<std::type_index, rttr::PointerTypeResolver*> m_customPointerTypeResolvers;
+	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
 	Json::Value m_jsonRoot;
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
 	bool m_isOk = false;

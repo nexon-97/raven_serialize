@@ -285,6 +285,14 @@ const char* Type::GetSmartPtrTypeName() const
 	return m_typeData->smartptrParams->smartptrTypeName;
 }
 
+void Type::AssignPointerValue(void* pointer, void* value) const
+{
+	if (IsSmartPointer())
+	{
+		m_typeData->smartptrParams->valueAssignFunc(pointer, value);
+	}
+}
+
 bool Type::operator==(const Type& other) const
 {
 	return m_typeData == other.m_typeData;
@@ -293,6 +301,11 @@ bool Type::operator==(const Type& other) const
 bool Type::operator!=(const Type& other) const
 {
 	return !(*this == other);
+}
+
+const void* Type::DebugViewValue(const void* value) const
+{
+	return m_typeData->debugValueViewer(value);
 }
 
 } // namespace rttr

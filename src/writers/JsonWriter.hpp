@@ -1,6 +1,6 @@
 #pragma once
 #include "writers/IWriter.hpp"
-#include "rttr/PointerTypeResolver.hpp"
+#include "rttr/CustomTypeResolver.hpp"
 #include "SerializationContext.hpp"
 
 #include <ostream>
@@ -30,7 +30,7 @@ public:
 	void RAVEN_SER_API WriteArray(const rttr::Type& itemType, const void* arrayStartPtr, const std::size_t size) final;
 	void RAVEN_SER_API WriteCustomObject(CustomObjectWriterFunc* objectWritersPtr, const std::size_t writersCount) final;
 
-	void RAVEN_SER_API AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver) final;
+	void RAVEN_SER_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
 private:
 	void RAVEN_SER_API DoWrite();
@@ -41,7 +41,7 @@ private:
 
 private:
 	std::ostream& m_stream;
-	std::unordered_map<std::type_index, rttr::PointerTypeResolver*> m_customPointerTypeResolvers;
+	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
 
 	// Json stack is used to hide serialization stack operations on json values from end user
 	// [USAGE] Create json values using private CreateJsonObject method,

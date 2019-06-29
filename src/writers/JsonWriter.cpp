@@ -38,9 +38,32 @@ JsonWriter::JsonWriter(std::ostream& stream, const bool prettyPrint)
 
 void JsonWriter::WriteObject(const rttr::Type& type, const void* value)
 {
-	if (nullptr == value)
+	const std::size_t debugStackSize = m_jsonStack.size();
+
+	rttr::CustomTypeResolver* resolver = nullptr;
+	auto customResolverIt = m_customTypeResolvers.find(type.GetTypeIndex());
+	if (customResolverIt != m_customTypeResolvers.end())
 	{
-		Json::Value& nullValue = CreateJsonObject(Json::nullValue);
+		resolver = customResolverIt->second;
+	}
+
+	if (nullptr != resolver)
+	{
+		auto resolveResult = resolver->Resolve(type, value);
+
+		if (nullptr != resolveResult && resolveResult->resolved)
+		{
+			WriteObject(resolveResult->resolvedType, resolveResult->resolvedValue);
+		}
+		else
+		{
+			// Custom resolver didn't resolve the pointer, so put null here
+			CreateJsonObject(Json::nullValue);
+		}
+	}
+	else if (nullptr == value)
+	{
+		CreateJsonObject(Json::nullValue);
 	}
 	else if (type.GetTypeIndex() == typeid(bool))
 	{
@@ -164,73 +187,39 @@ void JsonWriter::WriteObject(const rttr::Type& type, const void* value)
 		}
 	}
 	else if (type.IsPointer())
-	{
-		auto pointedType = type.GetUnderlyingType(0U);
+	{		
 		auto pointerTypeIndex = type.GetPointerTypeIndex(const_cast<void*>(value));
-
-		rttr::PointerTypeResolver* resolver = nullptr;
-		bool pointerResolved = false;
-
-		auto customResolverIt = m_customPointerTypeResolvers.find(pointerTypeIndex);
-		if (customResolverIt != m_customPointerTypeResolvers.end())
+		rttr::Type pointedMetaType = rttr::Reflect(pointerTypeIndex);
+		if (pointedMetaType.IsValid())
 		{
-			resolver = customResolverIt->second;
-		}
+			CreateSerializationContext();
 
-		if (nullptr == resolver)
-		{
-			// Try default resolver
-		}
-
-		std::unique_ptr<rttr::PointerTypeResolver::ResolveResult> resolveResult;
-		if (nullptr != resolver)
-		{
-			// Convert address to variable to pointer-to-pointer
-			const std::uintptr_t* pointerAddress = reinterpret_cast<const std::uintptr_t*>(value);
-			// Deference void* as pointer value
-			std::uintptr_t pointerValue = *pointerAddress;
-			// Interpret resolved pointer value as new pointer to void
-			const void* pointedAddress = reinterpret_cast<const void*>(pointerValue);
-
-			resolveResult = resolver->Resolve(pointedType, pointedAddress);
-			pointerResolved = true;
-
-			if (nullptr != resolveResult && resolveResult->resolved)
+			const void* const* ptrToValue = reinterpret_cast<const void* const*>(value);
+			if (nullptr == *ptrToValue)
 			{
-				WriteObject(resolveResult->resolvedType, resolveResult->resolvedValue);
+				CreateJsonObject(Json::nullValue);
 			}
 			else
 			{
-				// Custom resolver didn't resolve the pointer, so put null here
-				Json::Value& jsonNull = CreateJsonObject(Json::nullValue);
-			}
-		}
-
-		if (!pointerResolved)
-		{
-			// Pointers can have no custom resolvers, so must serialize them using serialization context
-			rttr::Type pointedMetaType = rttr::Reflect(pointerTypeIndex);
-			if (pointedMetaType.IsValid())
-			{
-				CreateSerializationContext();
-
-				const void* const* ptrToValue = reinterpret_cast<const void* const*>(value);
 				std::size_t objectId = m_context->AddObject(pointedMetaType, *ptrToValue);
 				Json::Value& jsonValue = CreateJsonObject(Json::objectValue);
 				jsonValue[k_typeId] = type.GetName();
 				jsonValue[k_ptrMarkerKey] = objectId;
-			}
-			else
-			{
-				Json::Value& jsonNull = CreateJsonObject(Json::nullValue);
-			}
+			}	
+		}
+		else
+		{
+			CreateJsonObject(Json::nullValue);
 		}
 	}
 	else
 	{
 		// This type is not supported?
-		Json::Value& jsonNull = CreateJsonObject(Json::nullValue);
+		CreateJsonObject(Json::nullValue);
 	}
+
+	const std::size_t debugStackSizeNew = m_jsonStack.size();
+	assert(debugStackSizeNew == debugStackSize + 1U);
 }
 
 void JsonWriter::WriteArray(const rttr::Type& itemType, const void* arrayStartPtr, const std::size_t size)
@@ -243,6 +232,7 @@ void JsonWriter::WriteArray(const rttr::Type& itemType, const void* arrayStartPt
 	for (std::size_t i = 0U; i < size; ++i)
 	{
 		WriteObject(itemType, arrayDataPtr + itemSize * i);
+
 		Json::Value& itemValue = *m_jsonStack.top();
 		arrayValue.append(itemValue);
 
@@ -274,9 +264,9 @@ std::string JsonWriter::WStringToUtf8(const wchar_t* _literal)
 	return utf8String;
 }
 
-void JsonWriter::AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver)
+void JsonWriter::AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver)
 {
-	m_customPointerTypeResolvers.emplace(type.GetTypeIndex(), resolver);
+	m_customTypeResolvers.emplace(type.GetTypeIndex(), resolver);
 }
 
 void JsonWriter::CreateSerializationContext()

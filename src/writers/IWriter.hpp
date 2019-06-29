@@ -1,6 +1,6 @@
 #pragma once
 #include "rttr/Type.hpp"
-#include "rttr/PointerTypeResolver.hpp"
+#include "rttr/CustomTypeResolver.hpp"
 
 namespace rs
 {
@@ -10,7 +10,7 @@ class IWriter
 public:
 	virtual ~IWriter() = default;
 
-	virtual void AddPointerTypeResolver(const rttr::Type& type, rttr::PointerTypeResolver* resolver) = 0;
+	virtual void AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) = 0;
 
 	// Used to write single data object, given its meta-type and pointer to object
 	virtual void WriteObject(const rttr::Type& type, const void* value) = 0;

@@ -113,6 +113,14 @@ void* GetStlCollectionItem(const void* collectionPtr, const std::size_t idx)
 }
 
 template <typename T>
+void AssignSmartptrValue(void* smartptr, void* value)
+{
+	T* smartPtrCasted = reinterpret_cast<T*>(smartptr);
+	auto dataPtr = reinterpret_cast<std::add_pointer<std::pointer_traits<T>::element_type>::type>(value);
+	smartPtrCasted->reset(dataPtr);
+}
+
+template <typename T>
 struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 {
 	ArrayDataResolver(type_data& metaTypeData)
@@ -160,6 +168,7 @@ struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
 	{
 		static SmartPtrParams smartptrParams;
 		smartptrParams.smartptrTypeName = smart_ptr_type_name_resolver<T>()();
+		smartptrParams.valueAssignFunc = AssignSmartptrValue<T>;
 
 		metaTypeData.underlyingType[0] = new Type(Reflect<smart_ptr_type<T>::type>());
 		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
@@ -203,6 +212,15 @@ struct TypeClassResolver
 {
 	TypeClass operator()() { return TypeClass::Invalid; }
 };
+
+template <typename T>
+const void* DebugValueViewerF(const void* value)
+{
+	const T* realValuePtr = reinterpret_cast<const T*>(value);
+	return realValuePtr;
+};
+
+////////////////////////////////////////////////////////////////////////////////////
 
 class Manager
 {
@@ -301,6 +319,8 @@ public:
 		{
 			SmartPointerTraitsResolver<T> smartptrTraitsResolver(metaTypeData);
 		}
+
+		metaTypeData.debugValueViewer = &DebugValueViewerF<T>;
 	}
 
 	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
