@@ -17,6 +17,7 @@ class Property;
 class Type;
 
 using MetaTypeInstanceAllocator = std::function<void*()>;
+using MetaTypeInstanceDestructor = std::function<void(void*)>;
 using PointerTypeIndexResolverFunc = std::function<std::type_index(void*)>;
 using SmartPtrValueResolver = std::function<void* (void*)>;
 using SmartPtrValueAssignFunc = std::function<void(void*, void*)>;
@@ -87,6 +88,7 @@ struct type_data
 	std::shared_ptr<std::size_t> arrayExtents;
 	std::vector<std::shared_ptr<Property>> properties;
 	MetaTypeInstanceAllocator instanceAllocator;
+	MetaTypeInstanceDestructor instanceDestructor;
 	PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
 	SmartPtrValueResolver smartPtrValueResolver;
 	DebugValueViewer debugValueViewer = nullptr;
@@ -134,6 +136,8 @@ public:
 	RAVEN_SER_API void* GetArrayItemValuePtr(void* value, const std::size_t idx) const;
 
 	RAVEN_SER_API void* Instantiate() const;
+	void RAVEN_SER_API Destroy(void* object) const;
+
 	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
 	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
 	RAVEN_SER_API const char* GetSmartPtrTypeName() const;

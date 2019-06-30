@@ -68,22 +68,20 @@ void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 
 			ReadImpl(objectType, object, contextObject);
 
-			m_context->AddObject(objectType, object);
+			// Check object marker
+			if (contextObject.isObject() && contextObject.isMember(k_ptrMarkerKey))
+			{
+				std::size_t markerId = static_cast<std::size_t>(contextObject[k_ptrMarkerKey].asUInt());
+				m_context->AddObject(markerId, objectType, object);
+			}
+			
 			++idx;
 		}
 
 		// Resolve pointers
-		for (const auto& ptrToResolve : m_context->GetPointersToFill())
+		for (const auto& pointerFiller : m_context->GetPointerFillers())
 		{
-			auto objectData = m_context->GetObjectById(ptrToResolve.objectId);
-			if (nullptr != objectData)
-			{
-				ptrToResolve.type.AssignPointerValue(ptrToResolve.pointerAddress, const_cast<void*>(objectData->objectPtr));
-			}
-			else
-			{
-				ptrToResolve.type.AssignPointerValue(ptrToResolve.pointerAddress, nullptr);
-			}
+			pointerFiller->Fill();
 		}
 	}
 	else
@@ -102,15 +100,11 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 	assert(m_isOk);
 
 	// Find custom type resolver for this type
-	rttr::CustomTypeResolver* customTypeResolver = nullptr;
 	auto customResolverIt = m_customTypeResolvers.find(type.GetTypeIndex());
 	if (customResolverIt != m_customTypeResolvers.end())
 	{
-		customTypeResolver = customResolverIt->second;
-	}
+		rttr::CustomTypeResolver* customTypeResolver = customResolverIt->second;
 
-	if (nullptr != customTypeResolver)
-	{
 		// Serialized value type
 		rttr::Type serializedValueType = DeduceType(jsonVal);
 		void* serializedValue = nullptr;
@@ -124,7 +118,7 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 
 		// Convert address to variable to pointer-to-pointer
 		std::uintptr_t* pointerAddress = reinterpret_cast<std::uintptr_t*>(value);
-		auto resolveResult = customTypeResolver->ResolveReverse(type, serializedValueType, pointerAddress, serializedValue);
+		auto result = customTypeResolver->ResolveReverse(type, serializedValueType, pointerAddress, serializedValue);
 	}
 	else if (type.GetTypeIndex() == typeid(nullptr_t))
 	{
@@ -227,7 +221,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 		if (nullptr != m_context && smartPtrValue.isObject())
 		{
 			auto markerId = smartPtrValue[k_ptrMarkerKey].asUInt();
-			m_context->AddPointerToFill(type, markerId, value);
+			auto filler = std::make_unique<detail::DefaultPointerFiller>(m_context.get(), type, markerId, value);
+			m_context->AddPointerFiller(std::move(filler));
 		}
 	}
 	else if (type.IsArray())
@@ -239,15 +234,13 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			type.SetDynamicArraySize(value, count);
 		}
 
-		auto itemType = type.GetUnderlyingType();
+		rttr::Type itemType = type.GetUnderlyingType();
 
 		std::size_t i = 0U;
-		for (const auto& jsonItem : jsonVal)
+		for (const Json::Value& jsonItem : jsonVal)
 		{
 			void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
-
 			ReadImpl(itemType, itemValuePtr, jsonItem);
-
 			++i;
 		}
 
@@ -259,22 +252,42 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 		std::size_t propertiesCount = type.GetPropertiesCount();
 		for (std::size_t i = 0U; i < propertiesCount; ++i)
 		{
-			auto property = type.GetProperty(i);
+			rttr::Property* property = type.GetProperty(i);
 			const rttr::Type& propertyType = property->GetType();
 			const char* propertyName = property->GetName();
 
-			const auto& itemJsonVal = jsonVal[propertyName];
-
-			void* valuePtr = nullptr;
-			bool needRelease = false;
-			property->GetMutatorContext(value, valuePtr, needRelease);
-
-			ReadImpl(propertyType, valuePtr, itemJsonVal);
-			property->CallMutator(value, valuePtr);
-
-			if (needRelease)
+			if (jsonVal.isMember(propertyName))
 			{
-				delete valuePtr;
+				const Json::Value& itemJsonVal = jsonVal[propertyName];
+
+				if (propertyType.IsSmartPointer())
+				{
+					const Json::Value& smartPtrValue = itemJsonVal[k_smartptrPointedValueKey];
+					if (nullptr != m_context && smartPtrValue.isObject())
+					{
+						Json::UInt markerId = smartPtrValue[k_ptrMarkerKey].asUInt();
+						auto filler = std::make_unique<detail::PropertyPointerFiller>(m_context.get(), markerId, value, property);
+						m_context->AddPointerFiller(std::move(filler));
+					}
+				}
+				else
+				{
+					void* valuePtr = nullptr;
+					bool needRelease = false;
+					property->GetMutatorContext(value, valuePtr, needRelease);
+
+					ReadImpl(propertyType, valuePtr, itemJsonVal);
+					property->CallMutator(value, valuePtr);
+
+					if (needRelease)
+					{
+						delete valuePtr;
+					}
+				}
+			}
+			else
+			{
+				// [TODO] Log property read error here
 			}
 		}
 	}
@@ -283,7 +296,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 		if (nullptr != m_context)
 		{
 			auto markerId = jsonVal[k_ptrMarkerKey].asUInt();
-			m_context->AddPointerToFill(type, markerId, value);
+			auto filler = std::make_unique<detail::DefaultPointerFiller>(m_context.get(), type, markerId, value);
+			m_context->AddPointerFiller(std::move(filler));
 		}
 	}
 }
@@ -349,4 +363,4 @@ rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
 	}
 }
 
-}
+} // namespace rs

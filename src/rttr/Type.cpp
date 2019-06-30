@@ -261,6 +261,11 @@ void* Type::Instantiate() const
 	return std::invoke(m_typeData->instanceAllocator);
 }
 
+void Type::Destroy(void* object) const
+{
+	std::invoke(m_typeData->instanceDestructor, object);
+}
+
 void* Type::GetSmartPtrValue(void* value) const
 {
 	assert(IsSmartPointer());

@@ -20,9 +20,9 @@ public:
 		, m_type(type)
 	{}
 
-	virtual void GetValue(const void* object, void*& storage, bool& needRelease) = 0;
-	virtual void GetMutatorContext(const void* object, void*& storage, bool& needRelease) = 0;
-	virtual void CallMutator(void* object, void* value) = 0;
+	virtual void GetValue(const void* object, void*& storage, bool& needRelease) const = 0;
+	virtual void GetMutatorContext(const void* object, void*& storage, bool& needRelease) const = 0;
+	virtual void CallMutator(void* object, void* value) const = 0;
 
 	const Type& GetType() const
 	{
@@ -51,7 +51,7 @@ public:
 		, m_signature(signature)
 	{}
 
-	void SetValue(ClassType* object, ValueType* value)
+	void SetValue(ClassType* object, ValueType* value) const
 	{
 		auto applicant = ApplySignatureT<SignatureType>(m_signature);
 		applicant(object, *value);
@@ -62,7 +62,7 @@ public:
 		return AccessBySignature(m_signature, object);
 	}
 
-	void GetValue(const void* object, void*& i_storage, bool& needRelease) final
+	void GetValue(const void* object, void*& i_storage, bool& needRelease) const final
 	{
 		// There is no need to allocate any additional memory, just cast the member pointer to void* and return
 		const void* valuePtr = &AccessBySignature(m_signature, reinterpret_cast<const ClassType*>(object));
@@ -70,14 +70,14 @@ public:
 		needRelease = false;
 	}
 
-	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) final
+	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) const final
 	{
 		const void* valuePtr = &AccessBySignature(m_signature, reinterpret_cast<const ClassType*>(object));
 		i_storage = const_cast<void*>(valuePtr);
 		needRelease = false;
 	}
 
-	void CallMutator(void* object, void* value) final
+	void CallMutator(void* object, void* value) const final
 	{
 		SetValue(reinterpret_cast<ClassType*>(object), reinterpret_cast<ValueType*>(value));
 	}
@@ -97,7 +97,7 @@ public:
 		, m_setterSignature(setterSignature)
 	{}
 
-	void SetValue(ClassType* object, ValueType* value)
+	void SetValue(ClassType* object, ValueType* value) const
 	{
 		auto applicant = ApplySignatureT<SetterSignature>(m_setterSignature);
 		applicant(object, *value);
@@ -108,21 +108,21 @@ public:
 		return AccessBySignature(m_getterSignature, object);
 	}
 
-	void GetValue(const void* object, void*& i_storage, bool& needRelease) final
+	void GetValue(const void* object, void*& i_storage, bool& needRelease) const final
 	{
 		auto storage = new ValueType(AccessBySignature(m_getterSignature, reinterpret_cast<const ClassType*>(object)));
 		i_storage = storage;
 		needRelease = true;
 	}
 
-	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) final
+	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) const final
 	{
 		auto storage = new ValueType();
 		i_storage = storage;
 		needRelease = true;
 	}
 
-	void CallMutator(void* object, void* value) final
+	void CallMutator(void* object, void* value) const final
 	{
 		SetValue(reinterpret_cast<ClassType*>(object), reinterpret_cast<ValueType*>(value));
 	}

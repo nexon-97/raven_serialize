@@ -5,16 +5,59 @@ namespace rs
 namespace detail
 {
 
+DefaultPointerFiller::DefaultPointerFiller(const SerializationContext* context
+	, const rttr::Type& type, const std::size_t objectId, void* pointerAddress)
+	: IPointerFiller(context)
+	, m_type(type)
+	, m_objectId(objectId)
+	, m_pointerAddress(pointerAddress)
+{}
+
+void DefaultPointerFiller::Fill()
+{
+	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
+	if (nullptr != objectData)
+	{
+		m_type.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
+	}
+	else
+	{
+		m_type.AssignPointerValue(m_pointerAddress, nullptr);
+	}
+}
+
+PropertyPointerFiller::PropertyPointerFiller(const SerializationContext* context
+	, const std::size_t objectId, void* object, const rttr::Property* property)
+	: IPointerFiller(context)
+	, m_objectId(objectId)
+	, m_object(object)
+	, m_property(property)
+{}
+
+void PropertyPointerFiller::Fill()
+{
+	const rttr::Type& propertyType = m_property->GetType();
+	void* tempPointer = propertyType.Instantiate();
+
+	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
+	if (nullptr != objectData)
+	{
+		propertyType.AssignPointerValue(tempPointer, const_cast<void*>(objectData->objectPtr));
+	}
+	else
+	{
+		propertyType.AssignPointerValue(tempPointer, nullptr);
+	}
+
+	m_property->CallMutator(m_object, tempPointer);
+
+	propertyType.Destroy(tempPointer);
+}
+
 SerializationContext::ObjectData::ObjectData(const rttr::Type& type, const void* objectPtr, const std::size_t objectId) noexcept
 	: type(type)
 	, objectPtr(objectPtr)
 	, objectId(objectId)
-{}
-
-SerializationContext::PointerToFillData::PointerToFillData(const rttr::Type& type, const std::size_t objectId, void* pointerAddress) noexcept
-	: type(type)
-	, objectId(objectId)
-	, pointerAddress(pointerAddress)
 {}
 
 std::size_t SerializationContext::AddObject(const rttr::Type& type, const void* objectPtr)
@@ -41,12 +84,17 @@ std::size_t SerializationContext::AddObject(const rttr::Type& type, const void* 
 	}
 }
 
-void SerializationContext::AddPointerToFill(const rttr::Type& type, const std::size_t objectId, void* pointerAddress)
+void SerializationContext::AddObject(const std::size_t idx, const rttr::Type& type, const void* objectPtr)
 {
-	m_pointersToFill.emplace_back(type, objectId, pointerAddress);
+	m_objects.emplace_back(type, objectPtr, idx);
 }
 
-SerializationContext::ObjectData* SerializationContext::GetObjectById(const std::size_t id)
+void SerializationContext::AddPointerFiller(std::unique_ptr<IPointerFiller>&& pointerFiller)
+{
+	m_pointerFillers.push_back(std::move(pointerFiller));
+}
+
+const SerializationContext::ObjectData* SerializationContext::GetObjectById(const std::size_t id) const
 {
 	auto predicate = [id](const ObjectData& data)
 	{
@@ -56,7 +104,7 @@ SerializationContext::ObjectData* SerializationContext::GetObjectById(const std:
 	auto it = std::find_if(m_objects.begin(), m_objects.end(), predicate);
 	if (it != m_objects.end())
 	{
-		SerializationContext::ObjectData& data = *it;
+		const SerializationContext::ObjectData& data = *it;
 		return &data;
 	}
 
@@ -68,9 +116,9 @@ const std::vector<SerializationContext::ObjectData>& SerializationContext::GetOb
 	return m_objects;
 }
 
-const std::vector<SerializationContext::PointerToFillData>& SerializationContext::GetPointersToFill() const
+const std::vector<std::unique_ptr<IPointerFiller>>& SerializationContext::GetPointerFillers() const
 {
-	return m_pointersToFill;
+	return m_pointerFillers;
 }
 
 } // namespace detail

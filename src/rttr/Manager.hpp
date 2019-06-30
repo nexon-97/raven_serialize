@@ -24,21 +24,52 @@ void FillArrayExtent(std::size_t* arrayExtents)
 	FillArrayExtentImpl<T>(arrayExtents, std::make_index_sequence<std::rank<T>::value>());
 }
 
-template <typename T>
+template <typename T, typename Cond = void>
 struct DefaultInstanceAllocator
 {
 	void* operator()() const
 	{
-		static_assert(std::is_default_constructible<T>::value, "Metatype must be default constructible!");
+		return nullptr;
+	}
+};
+
+template <typename T>
+struct DefaultInstanceAllocator<T, std::enable_if_t<std::is_default_constructible<T>::value>>
+{
+	void* operator()() const
+	{
 		return reinterpret_cast<void*>(new T());
 	}
 };
 
-struct PlaceholderInstanceAllocator
+template <typename T>
+struct DefaultInstanceAllocator<const T, std::enable_if_t<std::is_default_constructible<const T>::value>>
 {
 	void* operator()() const
 	{
-		return nullptr;
+		return const_cast<void*>(reinterpret_cast<const void*>(new T()));
+	}
+};
+
+template <typename T>
+struct DefaultInstanceDestructor
+{
+	void operator()(void* object) const
+	{
+		T* objectPtr = reinterpret_cast<T*>(object);
+		delete objectPtr;
+	}
+};
+
+template <typename T, std::size_t N>
+struct DefaultInstanceDestructor<T[N]>
+{
+	using UnderlyingType = typename std::remove_extent<T>::type;
+
+	void operator()(void* object) const
+	{
+		UnderlyingType* arrayPtr = reinterpret_cast<UnderlyingType*>(object);
+		delete[] arrayPtr;
 	}
 };
 
@@ -248,10 +279,8 @@ public:
 
 			FillMetaTypeData<T>(metaTypeData);
 
-			if (!std::is_same<AllocatorT, PlaceholderInstanceAllocator>::value)
-			{
-				metaTypeData.instanceAllocator = allocator;
-			}
+			metaTypeData.instanceAllocator = allocator;
+			metaTypeData.instanceDestructor = DefaultInstanceDestructor<T>();
 			
 			Type typeWrapper(&(emplaceResult.first->second));
 
@@ -273,10 +302,7 @@ public:
 					metaTypeData.isUserDefined = true;
 				}
 
-				if (!std::is_same<AllocatorT, PlaceholderInstanceAllocator>::value)
-				{
-					metaTypeData.instanceAllocator = allocator;
-				}
+				metaTypeData.instanceAllocator = allocator;
 			}
 
 			return Type(&(it->second));
@@ -351,7 +377,7 @@ Type MetaType(const char* name, Alloc allocatorObject)
 template <typename T>
 Type Reflect()
 {
-	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr, PlaceholderInstanceAllocator(), false);
+	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr, DefaultInstanceAllocator<T>(), false);
 }
 
 Type RAVEN_SER_API Reflect(const char* name);
