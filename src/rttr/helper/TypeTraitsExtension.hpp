@@ -178,41 +178,90 @@ struct ApplySignatureT<MutatorMethodByValue<T, ValueType>>
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-template <typename SignatureType, typename T, typename ValueType>
-const ValueType& AccessBySignature(SignatureType signature, const T* object)
-{
-	static_assert(false, "Cannot access by signature!");
-}
+template <typename>
+struct AccessBySignatureT {};
 
 template <typename T, typename ValueType>
-const ValueType& AccessBySignature(MemberSignature<T, ValueType> signature, const T* object)
+struct AccessBySignatureT<MemberSignature<T, ValueType>>
 {
-	return object->*signature;
-}
+	using SignatureT = MemberSignature<T, ValueType>;
+	SignatureT m_signature;
+
+	AccessBySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	const ValueType& operator()(const T* object)
+	{
+		return object->*m_signature;
+	}
+};
 
 template <typename T, typename ValueType>
-const ValueType& AccessBySignature(AccessorMethod<T, ValueType> signature, const T* object)
+struct AccessBySignatureT<AccessorMethod<T, ValueType>>
 {
-	return std::invoke(signature, object);
-}
+	using SignatureT = AccessorMethod<T, ValueType>;
+	SignatureT m_signature;
+
+	AccessBySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	const ValueType& operator()(const T* object)
+	{
+		return std::invoke(m_signature, object);
+	}
+};
 
 template <typename T, typename ValueType>
-const ValueType& AccessBySignature(AccessorMethodByValue<T, ValueType> signature, const T* object)
+struct AccessBySignatureT<AccessorMethodByValue<T, ValueType>>
 {
-	return std::invoke(signature, object);
-}
+	using SignatureT = AccessorMethodByValue<T, ValueType>;
+	SignatureT m_signature;
+
+	AccessBySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	ValueType operator()(const T* object)
+	{
+		return std::invoke(m_signature, object);
+	}
+};
 
 template <typename T, typename ValueType>
-ValueType AccessBySignature(AccessorMethodByValueNonConst<T, ValueType> signature, const T* object)
+struct AccessBySignatureT<AccessorMethodByValueNonConst<T, ValueType>>
 {
-	return std::invoke(signature, object);
-}
+	using SignatureT = AccessorMethodByValueNonConst<T, ValueType>;
+	SignatureT m_signature;
+
+	AccessBySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	ValueType operator()(const T* object)
+	{
+		T* removedConstObject = const_cast<T*>(object);
+		return std::invoke(m_signature, removedConstObject);
+	}
+};
 
 template <typename T, typename ValueType>
-const ValueType& AccessBySignature(AccessorMethodNonConst<T, ValueType> signature, const T* object)
+struct AccessBySignatureT<AccessorMethodNonConst<T, ValueType>>
 {
-	return std::invoke(signature, const_cast<T*>(object));
-}
+	using SignatureT = AccessorMethodNonConst<T, ValueType>;
+	SignatureT m_signature;
+
+	AccessBySignatureT(SignatureT signature)
+		: m_signature(signature)
+	{}
+
+	const ValueType& operator()(const T* object)
+	{
+		T* removedConstObject = const_cast<T*>(object);
+		return std::invoke(m_signature, removedConstObject);
+	}
+};
 
 ///////////////////////////////////////////////////////////////////////////////////////
 

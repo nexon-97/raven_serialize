@@ -3,6 +3,7 @@
 #include "rttr/Type.hpp"
 #include "rttr/CustomTypeResolver.hpp"
 #include "SerializationContext.hpp"
+#include "ContextPath.hpp"
 
 #include <istream>
 #include <unordered_map>
@@ -39,7 +40,8 @@ private:
 	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
 	Json::Value m_jsonRoot;
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
+	ContextPath m_contextPath;
 	bool m_isOk = false;
 };
 
-}
+} // namespace rs

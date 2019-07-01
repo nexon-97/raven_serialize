@@ -59,20 +59,25 @@ public:
 
 	const ValueType& GetValue(const ClassType* object) const
 	{
-		return AccessBySignature(m_signature, object);
+		auto accessorWrapper = AccessBySignatureT<SignatureType>(m_signature);
+		return accessorWrapper(object);
 	}
 
 	void GetValue(const void* object, void*& i_storage, bool& needRelease) const final
 	{
 		// There is no need to allocate any additional memory, just cast the member pointer to void* and return
-		const void* valuePtr = &AccessBySignature(m_signature, reinterpret_cast<const ClassType*>(object));
+		auto accessorWrapper = AccessBySignatureT<SignatureType>(m_signature);
+		const void* valuePtr = &accessorWrapper(reinterpret_cast<const ClassType*>(object));
+
 		i_storage = const_cast<void*>(valuePtr);
 		needRelease = false;
 	}
 
 	void GetMutatorContext(const void* object, void*& i_storage, bool& needRelease) const final
 	{
-		const void* valuePtr = &AccessBySignature(m_signature, reinterpret_cast<const ClassType*>(object));
+		auto accessorWrapper = AccessBySignatureT<SignatureType>(m_signature);
+		const void* valuePtr = &accessorWrapper(reinterpret_cast<const ClassType*>(object));
+
 		i_storage = const_cast<void*>(valuePtr);
 		needRelease = false;
 	}
@@ -105,12 +110,15 @@ public:
 
 	const ValueType& GetValue(const ClassType* object) const
 	{
-		return AccessBySignature(m_getterSignature, object);
+		auto accessorWrapper = AccessBySignatureT<GetterSignature>(m_getterSignature);
+		return accessorWrapper(object);
 	}
 
 	void GetValue(const void* object, void*& i_storage, bool& needRelease) const final
 	{
-		auto storage = new ValueType(AccessBySignature(m_getterSignature, reinterpret_cast<const ClassType*>(object)));
+		auto accessorWrapper = AccessBySignatureT<GetterSignature>(m_getterSignature);
+		auto storage = new ValueType(accessorWrapper(reinterpret_cast<const ClassType*>(object)));
+
 		i_storage = storage;
 		needRelease = true;
 	}
