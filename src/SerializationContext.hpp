@@ -1,58 +1,12 @@
 #pragma once
 #include "rttr/Type.hpp"
 #include "rttr/Property.hpp"
+#include "ptr/IPointerFiller.hpp"
 
 namespace rs
 {
 namespace detail
 {
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-class SerializationContext;
-
-class IPointerFiller
-{
-public:
-	explicit IPointerFiller(const SerializationContext* context)
-		: m_context(context)
-	{}
-
-	virtual void Fill() = 0;
-
-protected:
-	const SerializationContext* m_context;
-};
-
-class DefaultPointerFiller
-	: public IPointerFiller
-{
-public:
-	explicit DefaultPointerFiller(const SerializationContext* context, const rttr::Type& type, const std::size_t objectId, void* pointerAddress);
-
-	void Fill() final;
-
-private:
-	rttr::Type m_type;
-	std::size_t m_objectId;
-	void* m_pointerAddress;
-};
-
-class PropertyPointerFiller
-	: public IPointerFiller
-{
-public:
-	explicit PropertyPointerFiller(const SerializationContext* context, const std::size_t objectId, void* object, const rttr::Property* property);
-
-	void Fill() final;
-
-private:
-	const rttr::Property* m_property;
-	void* m_object;
-	std::size_t m_objectId;
-};
-
-////////////////////////////////////////////////////////////////////////////////////////
 
 class SerializationContext
 {
@@ -75,9 +29,13 @@ public:
 	RAVEN_SER_API const std::vector<ObjectData>& GetObjects() const;
 	RAVEN_SER_API const std::vector<std::unique_ptr<IPointerFiller>>& GetPointerFillers() const;
 
+	RAVEN_SER_API void* CreateTempVariable(const rttr::Type& type);
+	void RAVEN_SER_API ClearTempVariables();
+
 private:
 	std::vector<ObjectData> m_objects;
 	std::vector<std::unique_ptr<IPointerFiller>> m_pointerFillers;
+	std::vector<std::pair<rttr::Type, void*>> m_tempVariables;
 };
 
 } // namespace detail

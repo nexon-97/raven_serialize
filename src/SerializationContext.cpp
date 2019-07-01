@@ -5,55 +5,6 @@ namespace rs
 namespace detail
 {
 
-DefaultPointerFiller::DefaultPointerFiller(const SerializationContext* context
-	, const rttr::Type& type, const std::size_t objectId, void* pointerAddress)
-	: IPointerFiller(context)
-	, m_type(type)
-	, m_objectId(objectId)
-	, m_pointerAddress(pointerAddress)
-{}
-
-void DefaultPointerFiller::Fill()
-{
-	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
-	if (nullptr != objectData)
-	{
-		m_type.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
-	}
-	else
-	{
-		m_type.AssignPointerValue(m_pointerAddress, nullptr);
-	}
-}
-
-PropertyPointerFiller::PropertyPointerFiller(const SerializationContext* context
-	, const std::size_t objectId, void* object, const rttr::Property* property)
-	: IPointerFiller(context)
-	, m_objectId(objectId)
-	, m_object(object)
-	, m_property(property)
-{}
-
-void PropertyPointerFiller::Fill()
-{
-	const rttr::Type& propertyType = m_property->GetType();
-	void* tempPointer = propertyType.Instantiate();
-
-	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
-	if (nullptr != objectData)
-	{
-		propertyType.AssignPointerValue(tempPointer, const_cast<void*>(objectData->objectPtr));
-	}
-	else
-	{
-		propertyType.AssignPointerValue(tempPointer, nullptr);
-	}
-
-	m_property->CallMutator(m_object, tempPointer);
-
-	propertyType.Destroy(tempPointer);
-}
-
 SerializationContext::ObjectData::ObjectData(const rttr::Type& type, const void* objectPtr, const std::size_t objectId) noexcept
 	: type(type)
 	, objectPtr(objectPtr)
@@ -119,6 +70,22 @@ const std::vector<SerializationContext::ObjectData>& SerializationContext::GetOb
 const std::vector<std::unique_ptr<IPointerFiller>>& SerializationContext::GetPointerFillers() const
 {
 	return m_pointerFillers;
+}
+
+void* SerializationContext::CreateTempVariable(const rttr::Type& type)
+{
+	void* temp = type.Instantiate();
+	m_tempVariables.emplace_back(type, temp);
+	return temp;
+}
+
+void SerializationContext::ClearTempVariables()
+{
+	for (const auto& tempVar : m_tempVariables)
+	{
+		//tempVar.first.Destroy(tempVar.second);
+	}
+	m_tempVariables.clear();
 }
 
 } // namespace detail

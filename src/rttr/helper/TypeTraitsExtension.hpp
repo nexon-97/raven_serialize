@@ -191,9 +191,10 @@ struct AccessBySignatureT<MemberSignature<T, ValueType>>
 		: m_signature(signature)
 	{}
 
-	const ValueType& operator()(const T* object)
+	ValueType& operator()(const T* object)
 	{
-		return object->*m_signature;
+		T* removedConstObject = const_cast<T*>(object);
+		return removedConstObject->*m_signature;
 	}
 };
 

@@ -124,7 +124,8 @@ public:
 	RAVEN_SER_API const Type& GetUnderlyingType(const std::size_t index = 0U) const;
 	const std::size_t RAVEN_SER_API GetArrayRank() const;
 	const std::size_t RAVEN_SER_API GetArrayExtent(const std::size_t dimension = 0U) const;
-	RAVEN_SER_API Property* Type::GetProperty(const std::size_t propertyIdx) const;
+	RAVEN_SER_API Property* GetProperty(const std::size_t propertyIdx) const;
+	RAVEN_SER_API Property* FindProperty(const std::string& name) const;
 	std::size_t RAVEN_SER_API GetPropertiesCount() const;
 	RAVEN_SER_API const std::type_index& GetTypeIndex() const;
 

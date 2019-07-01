@@ -23,6 +23,8 @@ public:
 	virtual void GetValue(const void* object, void*& storage, bool& needRelease) const = 0;
 	virtual void GetMutatorContext(const void* object, void*& storage, bool& needRelease) const = 0;
 	virtual void CallMutator(void* object, void* value) const = 0;
+	virtual void* GetValueAddress(void* object) const = 0;
+	virtual bool NeedsTempVariable() const = 0;
 
 	const Type& GetType() const
 	{
@@ -87,6 +89,20 @@ public:
 		SetValue(reinterpret_cast<ClassType*>(object), reinterpret_cast<ValueType*>(value));
 	}
 
+	bool NeedsTempVariable() const final
+	{
+		return false;
+	}
+
+	void* GetValueAddress(void* object) const final
+	{
+		AccessBySignatureT<SignatureType> accessorWrapper(m_signature);
+		ValueType& valueRef = accessorWrapper(reinterpret_cast<ClassType*>(object));
+		void* valuePtr = reinterpret_cast<void*>(&valueRef);
+
+		return valuePtr;
+	}
+
 private:
 	SignatureType m_signature;
 };
@@ -133,6 +149,16 @@ public:
 	void CallMutator(void* object, void* value) const final
 	{
 		SetValue(reinterpret_cast<ClassType*>(object), reinterpret_cast<ValueType*>(value));
+	}
+
+	bool NeedsTempVariable() const final
+	{
+		return true;
+	}
+
+	void* GetValueAddress(void* object) const final
+	{
+		return nullptr;
 	}
 
 private:

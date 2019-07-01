@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "rttr/Property.hpp"
+
 namespace rs
 {
 
@@ -27,6 +29,12 @@ public:
 		PathItem& operator=(const PathItem& other);
 	};
 
+	struct PropertyData
+	{
+		rttr::Property* property = nullptr;
+		void* object = nullptr;
+	};
+
 	ContextPath() = default;
 	ContextPath(std::vector<PathItem>&& pathItems);
 
@@ -39,6 +47,10 @@ public:
 	void PopAction();
 	const PathItem* GetTopAction() const;
 	const std::vector<PathItem>& GetActions() const;
+
+	std::size_t GetSize() const;
+
+	PropertyData ResolvePropertyData(const rttr::Type& rootType, void* contextRoot) const;
 
 private:
 	std::vector<PathItem> m_pathItems;

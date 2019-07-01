@@ -120,6 +120,21 @@ Property* Type::GetProperty(const std::size_t propertyIdx) const
 	return m_typeData->properties[propertyIdx].get();
 }
 
+Property* Type::FindProperty(const std::string& name) const
+{
+	assert(IsClass());
+
+	for (auto& property : m_typeData->properties)
+	{
+		if (property->GetName() == name)
+		{
+			return property.get();
+		}
+	}
+
+	return nullptr;
+}
+
 std::size_t Type::GetPropertiesCount() const
 {
 	assert(IsClass());

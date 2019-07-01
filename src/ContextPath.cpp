@@ -84,4 +84,39 @@ const std::vector<ContextPath::PathItem>& ContextPath::GetActions() const
 	return m_pathItems;
 }
 
+std::size_t ContextPath::GetSize() const
+{
+	return m_pathItems.size();
+}
+
+ContextPath::PropertyData ContextPath::ResolvePropertyData(const rttr::Type& rootType, void* contextRoot) const
+{
+	PropertyData result;
+
+	const PathItem* topAction = GetTopAction();
+	if (nullptr != topAction && topAction->actionType == ActionType::ObjectProperty)
+	{
+		void* currentObjectPtr = contextRoot;
+		rttr::Type currentObjectType = rootType;
+
+		for (const PathItem& item : m_pathItems)
+		{
+			switch (item.actionType)
+			{
+				case ActionType::ObjectProperty:
+					rttr::Property* objectProperty = currentObjectType.FindProperty(*item.propertyName);
+					if (nullptr != objectProperty)
+					{
+
+					}
+					break;
+			}
+		}
+
+		result.object = currentObjectPtr;
+	}
+
+	return result;
+}
+
 } // namespace rs
