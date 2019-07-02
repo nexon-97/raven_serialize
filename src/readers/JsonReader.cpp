@@ -213,6 +213,11 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			}
 		}
 	}
+	else if (type.IsEnum())
+	{
+		const rttr::Type& enumUnderlyingType = type.GetUnderlyingType(0U);
+		ReadImpl(enumUnderlyingType, value, jsonVal);
+	}
 	else if (type.IsIntegral())
 	{
 		if (type.IsSigned())
