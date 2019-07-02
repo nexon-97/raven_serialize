@@ -144,6 +144,21 @@ void* GetStlCollectionItem(const void* collectionPtr, const std::size_t idx)
 	return const_cast<void*>(reinterpret_cast<const void*>(collection->data() + idx));
 }
 
+void RAVEN_SER_API CollectionResizeNoop(void*, const std::size_t);
+
+template <typename T>
+std::size_t GetStaticArraySize(const void* collectionPtr)
+{
+	return std::extent<T>::value;
+}
+
+template <typename T>
+void* GetStaticArrayItem(const void* collectionPtr, const std::size_t idx)
+{
+	const T* collection = reinterpret_cast<const T*>(collectionPtr);
+	return const_cast<void*>(reinterpret_cast<const void*>(collection + idx));
+}
+
 template <typename T>
 void AssignSmartptrValue(void* smartptr, void* value)
 {
@@ -184,6 +199,13 @@ struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value>>
 
 		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
 		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
+
+		// Fill dynamic array params
+		static DynamicArrayParams dynamicArrayParams;
+		dynamicArrayParams.resizeFunc = CollectionResizeNoop;
+		dynamicArrayParams.getSizeFunc = GetStaticArraySize<T>;
+		dynamicArrayParams.getItemFunc = GetStaticArrayItem<T>;
+		metaTypeData.dynamicArrayParams = &dynamicArrayParams;
 	}
 };
 

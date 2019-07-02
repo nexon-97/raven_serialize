@@ -4,6 +4,8 @@
 namespace rttr
 {
 
+void CollectionResizeNoop(void*, const std::size_t) {}
+
 void InitRavenSerialization()
 {
 	MetaType<rs::detail::SerializationContext>("@context@");
