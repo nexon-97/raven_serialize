@@ -3,5 +3,6 @@
 enum class ReaderActionType
 {
 	ResolvePtr,
+	CustomResolver,
 	CallMutator,
 };

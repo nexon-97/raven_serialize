@@ -22,7 +22,7 @@ public:
 	template <typename T>
 	void Read(T& value)
 	{
-		ReadObjectWithContext(rttr::Reflect<T>(), &value);
+		Read(rttr::Reflect<T>(), &value);
 	}
 
 	void RAVEN_SER_API Read(const rttr::Type& type, void* value) final;
@@ -31,7 +31,6 @@ public:
 	void RAVEN_SER_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
 private:
-	void RAVEN_SER_API ReadObjectWithContext(const rttr::Type& type, void* value);
 	void RAVEN_SER_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	rttr::Type DeduceType(const Json::Value& jsonVal) const;
 	std::string GetObjectClassName(const Json::Value& jsonVal) const;

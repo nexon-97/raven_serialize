@@ -1,4 +1,5 @@
 #include "SerializationContext.hpp"
+#include "rs/log/Log.hpp"
 
 namespace rs
 {
@@ -75,6 +76,10 @@ const std::vector<std::unique_ptr<IPointerFiller>>& SerializationContext::GetPoi
 void* SerializationContext::CreateTempVariable(const rttr::Type& type)
 {
 	void* temp = type.Instantiate();
+
+	auto varAddressAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(temp));
+	Log::LogMessage("Temp variable created: (%s; 0x%llX)", type.GetName(), varAddressAsInt);
+
 	m_tempVariables.emplace_back(type, temp);
 	return temp;
 }
@@ -83,7 +88,10 @@ void SerializationContext::ClearTempVariables()
 {
 	for (const auto& tempVar : m_tempVariables)
 	{
-		//tempVar.first.Destroy(tempVar.second);
+		auto varAddressAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(tempVar.second));
+		Log::LogMessage("Temp variable destroyed: (%s; 0x%llX)", tempVar.first.GetName(), varAddressAsInt);
+
+		tempVar.first.Destroy(tempVar.second);
 	}
 	m_tempVariables.clear();
 }

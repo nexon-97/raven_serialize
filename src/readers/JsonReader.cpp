@@ -6,6 +6,7 @@
 #include "ptr/PropertyPointerFiller.hpp"
 #include "actions/CallObjectMutatorAction.hpp"
 #include "actions/ResolvePointerAction.hpp"
+#include "actions/CustomResolverAction.hpp"
 
 namespace
 {
@@ -46,14 +47,28 @@ JsonReader::JsonReader(std::istream& stream)
 	delete[] buffer;
 }
 
-void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
+void JsonReader::SortActions()
 {
-	char* buffer = new char[250];
-	unsigned long long valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
-	unsigned long long readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-	sprintf_s(buffer, 250, "JsonReader [0x%llX] starts reading object: (%s, 0x%llX)", readerAsInt, type.GetName(), valueAsInt);
-	Log::LogMessage(std::string(buffer));
-	delete[] buffer;
+	using ActionPtr = std::unique_ptr<detail::IReaderAction>;
+	auto predicate = [](const ActionPtr& lhs, const ActionPtr& rhs)
+	{
+		// First sort by action types
+		if (lhs->GetActionType() != rhs->GetActionType())
+		{
+			return static_cast<int>(lhs->GetActionType()) < static_cast<int>(rhs->GetActionType());
+		}
+
+		// Then, if the same class, go the deeper operations
+		return lhs->GetDepth() > rhs->GetDepth();
+	};
+	std::stable_sort(m_actions.begin(), m_actions.end(), predicate);
+}
+
+void JsonReader::Read(const rttr::Type& type, void* value)
+{
+	//
+	auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+	Log::LogMessage("=========\nJsonReader [0x%llX] started reading session\n=========", readerAsInt);
 
 	std::string className = GetObjectClassName(m_jsonRoot);
 	m_context = std::make_unique<rs::detail::SerializationContext>();
@@ -77,7 +92,17 @@ void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 				m_currentRootObject = objectType.Instantiate();
 			}
 
+			//
+			auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
+			auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+			Log::LogMessage("JsonReader [0x%llX] started reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
+
 			ReadImpl(objectType, m_currentRootObject, contextObject);
+
+			//
+			valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
+			readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+			Log::LogMessage("JsonReader [0x%llX] ended reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
 
 			// Check object marker
 			if (contextObject.isObject() && contextObject.isMember(k_ptrMarkerKey))
@@ -87,7 +112,7 @@ void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 			}
 
 			m_currentRootObject = nullptr;
-			
+
 			++idx;
 		}
 	}
@@ -110,34 +135,8 @@ void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 	m_context->ClearTempVariables();
 
 	//
-	buffer = new char[250];
-	valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
 	readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-	sprintf_s(buffer, 250, "JsonReader [0x%llX] ended reading object: (%s, 0x%llX)", readerAsInt, type.GetName(), valueAsInt);
-	Log::LogMessage(std::string(buffer));
-	delete[] buffer;
-}
-
-void JsonReader::SortActions()
-{
-	using ActionPtr = std::unique_ptr<detail::IReaderAction>;
-	auto predicate = [](const ActionPtr& lhs, const ActionPtr& rhs)
-	{
-		// First sort by action types
-		if (lhs->GetActionType() != rhs->GetActionType())
-		{
-			return static_cast<int>(lhs->GetActionType()) < static_cast<int>(rhs->GetActionType());
-		}
-
-		// Then, if the same class, go the deeper operations
-		return lhs->GetDepth() > rhs->GetDepth();
-	};
-	std::stable_sort(m_actions.begin(), m_actions.end(), predicate);
-}
-
-void JsonReader::Read(const rttr::Type& type, void* value)
-{
-	//ReadImpl(type, value, jsonValue);
+	Log::LogMessage("=========\nJsonReader [0x%llX] ended reading session\n=========", readerAsInt);
 }
 
 void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
@@ -161,9 +160,9 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			ReadImpl(serializedValueType, serializedValue, jsonVal);
 		}
 
-		// Convert address to variable to pointer-to-pointer
-		std::uintptr_t* pointerAddress = reinterpret_cast<std::uintptr_t*>(value);
-		auto result = customTypeResolver->ResolveReverse(type, serializedValueType, pointerAddress, serializedValue);
+		auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
+			, type, value, serializedValueType, serializedValue, customTypeResolver);
+		m_actions.push_back(std::move(resolverAction));
 	}
 	else if (type.GetTypeIndex() == typeid(nullptr_t))
 	{
@@ -297,13 +296,10 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
 			
 			//
-			char* buffer = new char[400];
 			auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
 			auto itemAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(itemValuePtr));
 			auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-			sprintf_s(buffer, 400, "JsonReader [0x%llX] array item ptr: (array at 0x%llX, item at 0x%llX)", readerAsInt, valueAsInt, itemAsInt);
-			Log::LogMessage(std::string(buffer));
-			delete[] buffer;
+			Log::LogMessage("JsonReader [0x%llX] array item ptr: (array at 0x%llX, item at 0x%llX)", readerAsInt, valueAsInt, itemAsInt);
 
 			ReadImpl(itemType, itemValuePtr, jsonItem);
 			++i;

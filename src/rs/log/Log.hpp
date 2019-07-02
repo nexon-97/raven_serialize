@@ -11,10 +11,12 @@ class Log
 {
 public:
 	static void RAVEN_SER_API AddLogger(ILogger* logger);
-	static void RAVEN_SER_API LogMessage(const std::string& msg);
+	static void RAVEN_SER_API LogMessage(std::string format, ...);
+	static void RAVEN_SER_API Enable(const bool enable);
 
 private:
 	static std::vector<ILogger*> s_loggers;
+	static bool s_isEnabled;
 };
 
 } // namespace rs
