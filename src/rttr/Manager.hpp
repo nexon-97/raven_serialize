@@ -2,6 +2,7 @@
 #include "rttr/Type.hpp"
 #include "helper/TypeTraitsExtension.hpp"
 #include "raven_serialize.hpp"
+#include "rs/log/Log.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -284,6 +285,8 @@ public:
 			
 			Type typeWrapper(&(emplaceResult.first->second));
 
+			rs::Log::LogMessage(std::string("Meta type registered: ") + metaTypeData.name);
+
 			return typeWrapper;
 		}
 		else
@@ -303,6 +306,8 @@ public:
 				}
 
 				metaTypeData.instanceAllocator = allocator;
+
+				rs::Log::LogMessage(std::string("Meta type registered: ") + metaTypeData.name);
 			}
 
 			return Type(&(it->second));

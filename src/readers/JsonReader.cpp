@@ -48,6 +48,13 @@ JsonReader::JsonReader(std::istream& stream)
 
 void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 {
+	char* buffer = new char[250];
+	unsigned long long valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
+	unsigned long long readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+	sprintf_s(buffer, 250, "JsonReader [0x%llX] starts reading object: (%s, 0x%llX)", readerAsInt, type.GetName(), valueAsInt);
+	Log::LogMessage(std::string(buffer));
+	delete[] buffer;
+
 	std::string className = GetObjectClassName(m_jsonRoot);
 	m_context = std::make_unique<rs::detail::SerializationContext>();
 
@@ -93,12 +100,6 @@ void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 		m_currentRootObject = nullptr;
 	}
 
-	// Resolve pointers
-	for (const auto& pointerFiller : m_context->GetPointerFillers())
-	{
-		pointerFiller->Fill();
-	}
-
 	// Perform actions
 	SortActions();
 	for (const auto& action : m_actions)
@@ -107,6 +108,14 @@ void JsonReader::ReadObjectWithContext(const rttr::Type& type, void* value)
 	}
 
 	m_context->ClearTempVariables();
+
+	//
+	buffer = new char[250];
+	valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
+	readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+	sprintf_s(buffer, 250, "JsonReader [0x%llX] ended reading object: (%s, 0x%llX)", readerAsInt, type.GetName(), valueAsInt);
+	Log::LogMessage(std::string(buffer));
+	delete[] buffer;
 }
 
 void JsonReader::SortActions()
@@ -286,6 +295,16 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			m_contextPath.PushArrayItemAction(i);
 
 			void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
+			
+			//
+			char* buffer = new char[400];
+			auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
+			auto itemAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(itemValuePtr));
+			auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+			sprintf_s(buffer, 400, "JsonReader [0x%llX] array item ptr: (array at 0x%llX, item at 0x%llX)", readerAsInt, valueAsInt, itemAsInt);
+			Log::LogMessage(std::string(buffer));
+			delete[] buffer;
+
 			ReadImpl(itemType, itemValuePtr, jsonItem);
 			++i;
 
@@ -336,12 +355,12 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 	}
 	else if (type.IsPointer())
 	{
-		/*if (nullptr != m_context)
+		if (jsonVal.isObject() && jsonVal.isMember(k_ptrMarkerKey))
 		{
-			auto markerId = jsonVal[k_ptrMarkerKey].asUInt();
-			auto filler = std::make_unique<detail::DefaultPointerFiller>(m_context.get(), type, markerId, value);
-			m_context->AddPointerFiller(std::move(filler));
-		}*/
+			std::size_t markerId = static_cast<std::size_t>(jsonVal[k_ptrMarkerKey].asUInt());
+			auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
+			m_actions.push_back(std::move(resolvePtrAction));
+		}
 	}
 }
 

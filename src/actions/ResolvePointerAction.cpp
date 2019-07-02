@@ -1,5 +1,6 @@
 #include "actions/ResolvePointerAction.hpp"
 #include "SerializationContext.hpp"
+#include "rs/log/Log.hpp"
 
 namespace rs
 {
@@ -17,6 +18,8 @@ ResolvePointerAction::ResolvePointerAction(const std::size_t depth, Serializatio
 
 void ResolvePointerAction::Perform()
 {
+	Log::LogMessage("ResolvePointerAction performed.");
+
 	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_markerId);
 	if (nullptr != objectData)
 	{
