@@ -8,6 +8,9 @@
 #include "actions/ResolvePointerAction.hpp"
 #include "actions/CustomResolverAction.hpp"
 
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+#include <codecvt>
+
 namespace
 {
 const char* k_typeId = "$type$";
@@ -200,7 +203,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			}
 			else if (type.GetTypeIndex() == typeid(std::wstring))
 			{
-				*static_cast<std::wstring*>(value) = std::wstring(L"default_wstring");
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+				*static_cast<std::wstring*>(value) = converter.from_bytes(strValue);
 			}
 			else if (type.GetTypeIndex() == typeid(const char*))
 			{
