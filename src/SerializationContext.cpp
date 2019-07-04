@@ -41,11 +41,6 @@ void SerializationContext::AddObject(const std::size_t idx, const rttr::Type& ty
 	m_objects.emplace_back(type, objectPtr, idx);
 }
 
-void SerializationContext::AddPointerFiller(std::unique_ptr<IPointerFiller>&& pointerFiller)
-{
-	m_pointerFillers.push_back(std::move(pointerFiller));
-}
-
 const SerializationContext::ObjectData* SerializationContext::GetObjectById(const std::size_t id) const
 {
 	auto predicate = [id](const ObjectData& data)
@@ -66,11 +61,6 @@ const SerializationContext::ObjectData* SerializationContext::GetObjectById(cons
 const std::vector<SerializationContext::ObjectData>& SerializationContext::GetObjects() const
 {
 	return m_objects;
-}
-
-const std::vector<std::unique_ptr<IPointerFiller>>& SerializationContext::GetPointerFillers() const
-{
-	return m_pointerFillers;
 }
 
 void* SerializationContext::CreateTempVariable(const rttr::Type& type)

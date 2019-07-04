@@ -167,10 +167,6 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			, type, value, serializedValueType, serializedValue, customTypeResolver);
 		m_actions.push_back(std::move(resolverAction));
 	}
-	else if (type.GetTypeIndex() == typeid(nullptr_t))
-	{
-		// Skip nullptr
-	}
 	else if (type.GetTypeIndex() == typeid(bool))
 	{
 		*static_cast<bool*>(value) = jsonVal.asBool();

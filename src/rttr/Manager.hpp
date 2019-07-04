@@ -155,8 +155,12 @@ std::size_t GetStaticArraySize(const void* collectionPtr)
 template <typename T>
 void* GetStaticArrayItem(const void* collectionPtr, const std::size_t idx)
 {
-	const T* collection = reinterpret_cast<const T*>(collectionPtr);
-	return const_cast<void*>(reinterpret_cast<const void*>(collection + idx));
+	using UnderlyingType = typename std::remove_extent<T>::type;
+
+	T* castedCollection = const_cast<T*>(reinterpret_cast<const T*>(collectionPtr));
+	UnderlyingType* item = reinterpret_cast<UnderlyingType*>(castedCollection) + idx;
+
+	return reinterpret_cast<void*>(item);
 }
 
 template <typename T>
