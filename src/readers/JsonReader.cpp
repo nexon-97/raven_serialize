@@ -84,37 +84,39 @@ void JsonReader::Read(const rttr::Type& type, void* value)
 		for (const Json::Value& contextObject : contextObjects)
 		{
 			rttr::Type objectType = DeduceType(contextObject);
-			m_currentRootObject = nullptr;
 
-			if (idx == 0U)
+			if (objectType.IsValid())
 			{
-				m_currentRootObject = value;
-			}
-			else
-			{
-				m_currentRootObject = objectType.Instantiate();
-			}
+				if (idx == 0U)
+				{
+					m_currentRootObject = value;
+				}
+				else
+				{
+					m_currentRootObject = objectType.Instantiate();
+				}
 
-			//
-			auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
-			auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-			Log::LogMessage("JsonReader [0x%llX] started reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
+				//
+				auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
+				auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+				Log::LogMessage("JsonReader [0x%llX] started reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
 
-			ReadImpl(objectType, m_currentRootObject, contextObject);
+				ReadImpl(objectType, m_currentRootObject, contextObject);
 
-			//
-			valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
-			readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-			Log::LogMessage("JsonReader [0x%llX] ended reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
+				//
+				valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
+				readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+				Log::LogMessage("JsonReader [0x%llX] ended reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
 
-			// Check object marker
-			if (contextObject.isObject() && contextObject.isMember(k_ptrMarkerKey))
-			{
-				std::size_t markerId = static_cast<std::size_t>(contextObject[k_ptrMarkerKey].asUInt());
-				m_context->AddObject(markerId, objectType, m_currentRootObject);
-			}
+				// Check object marker
+				if (contextObject.isObject() && contextObject.isMember(k_ptrMarkerKey))
+				{
+					std::size_t markerId = static_cast<std::size_t>(contextObject[k_ptrMarkerKey].asUInt());
+					m_context->AddObject(markerId, objectType, m_currentRootObject);
+				}
 
-			m_currentRootObject = nullptr;
+				m_currentRootObject = nullptr;
+			}	
 
 			++idx;
 		}
