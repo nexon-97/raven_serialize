@@ -319,11 +319,19 @@ public:
 		{
 			if (userDefined)
 			{
-				auto& metaTypeData = it->second;
+				type_data& metaTypeData = it->second;
 
 				if (nullptr != name)
 				{
+					// Remove old registered name from lookup table
+					auto nameIt = m_typeNames.find(metaTypeData.name);
+					if (nameIt != m_typeNames.end())
+					{
+						m_typeNames.erase(nameIt);
+					}
+
 					metaTypeData.name = name;
+					m_typeNames.emplace(name, &metaTypeData);
 				}
 
 				if (!metaTypeData.isUserDefined)
