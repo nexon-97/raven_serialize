@@ -328,4 +328,12 @@ const void* Type::DebugViewValue(const void* value) const
 	return m_typeData->debugValueViewer(value);
 }
 
+Type& Type::DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
+{
+	std::shared_ptr<Property> property = std::make_shared<rttr::CustomProperty>(name, policy);
+	AddProperty(std::move(property));
+
+	return *this;
+}
+
 } // namespace rttr

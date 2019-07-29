@@ -391,6 +391,22 @@ public:
 	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
 	Type RAVEN_SER_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
 
+	template <typename Signature>
+	static std::shared_ptr<Property> CreateProperty(Signature signature)
+	{
+		using T = typename ExtractClassType<Signature>::type;
+		return std::make_shared<MemberProperty<T, typename ExtractValueType<Signature>::type, Signature>>("", signature);
+	}
+
+	template <typename GetterSignature, typename SetterSignature>
+	static std::shared_ptr<Property> CreateProperty(GetterSignature getter, SetterSignature setter)
+	{
+		static_assert(std::is_same<ExtractValueType<GetterSignature>::type, ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
+		
+		using T = typename ExtractClassType<GetterSignature>::type;
+		return std::make_shared<IndirectProperty<T, typename ExtractValueType<GetterSignature>::type, GetterSignature, SetterSignature>>(name, getter, setter);
+	}
+
 	static RAVEN_SER_API Manager& GetRTTRManager();
 
 private:

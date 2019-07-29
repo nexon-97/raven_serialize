@@ -10,6 +10,11 @@
 #include <typeindex>
 #include <functional>
 
+namespace rs
+{
+class ICustomPropertyResolvePolicy;
+}
+
 namespace rttr
 {
 
@@ -174,6 +179,8 @@ public:
 
 		return *this;
 	}
+
+	RAVEN_SER_API Type& DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy);
 
 	uint64_t RAVEN_SER_API CastToUnsignedInteger(const void* value) const;
 	int64_t RAVEN_SER_API CastToSignedInteger(const void* value) const;

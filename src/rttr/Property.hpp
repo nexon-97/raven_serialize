@@ -2,6 +2,8 @@
 #include "rttr/Aliases.hpp"
 #include "rttr/helper/TypeTraitsExtension.hpp"
 #include "rttr/Type.hpp"
+#include "rttr/Manager.hpp"
+#include "rs/ICustomPropertyResolvePolicy.hpp"
 #include <unordered_map>
 #include <string>
 #include <typeindex>
@@ -49,7 +51,7 @@ class MemberProperty
 {
 public:
 	MemberProperty(const char* name, SignatureType signature)
-		: Property(name, rttr::Reflect<ValueType>())
+		: Property(name, Reflect<ValueType>())
 		, m_signature(signature)
 	{}
 
@@ -113,7 +115,7 @@ class IndirectProperty
 {
 public:
 	IndirectProperty(const char* name, GetterSignature getterSignature, SetterSignature setterSignature)
-		: Property(name, rttr::Reflect<ValueType>())
+		: Property(name, Reflect<ValueType>())
 		, m_getterSignature(getterSignature)
 		, m_setterSignature(setterSignature)
 	{}
@@ -164,6 +166,44 @@ public:
 private:
 	GetterSignature m_getterSignature;
 	SetterSignature m_setterSignature;
+};
+
+class CustomProperty
+	: public Property
+{
+public:
+	CustomProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
+		: Property(name, Reflect<int>())
+		, m_policy(policy)
+	{}
+
+	void GetValue(const void* object, void*& storage, bool& needRelease) const final
+	{
+
+	}
+
+	void GetMutatorContext(const void* object, void*& storage, bool& needRelease) const final
+	{
+
+	}
+
+	void CallMutator(void* object, void* value) const final
+	{
+
+	}
+
+	void* GetValueAddress(void* object) const final
+	{
+		return nullptr;
+	}
+	
+	bool NeedsTempVariable() const final
+	{
+		return false;
+	}
+
+private:
+	rs::ICustomPropertyResolvePolicy* m_policy;
 };
 
 } // namespace rttr
