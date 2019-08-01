@@ -27,6 +27,7 @@ public:
 	virtual void CallMutator(void* object, void* value) const = 0;
 	virtual void* GetValueAddress(void* object) const = 0;
 	virtual bool NeedsTempVariable() const = 0;
+	virtual bool IsCustom() const = 0;
 
 	const Type& GetType() const
 	{
@@ -105,6 +106,11 @@ public:
 		return valuePtr;
 	}
 
+	bool IsCustom() const final
+	{
+		return false;
+	}
+
 private:
 	SignatureType m_signature;
 };
@@ -163,6 +169,11 @@ public:
 		return nullptr;
 	}
 
+	bool IsCustom() const final
+	{
+		return false;
+	}
+
 private:
 	GetterSignature m_getterSignature;
 	SetterSignature m_setterSignature;
@@ -173,24 +184,13 @@ class CustomProperty
 {
 public:
 	CustomProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
-		: Property(name, Reflect<int>())
+		: Property(name, policy->GetType())
 		, m_policy(policy)
 	{}
 
-	void GetValue(const void* object, void*& storage, bool& needRelease) const final
-	{
-
-	}
-
-	void GetMutatorContext(const void* object, void*& storage, bool& needRelease) const final
-	{
-
-	}
-
-	void CallMutator(void* object, void* value) const final
-	{
-
-	}
+	void GetValue(const void* object, void*& storage, bool& needRelease) const final {}
+	void GetMutatorContext(const void* object, void*& storage, bool& needRelease) const final {}
+	void CallMutator(void* object, void* value) const final {}
 
 	void* GetValueAddress(void* object) const final
 	{
@@ -200,6 +200,16 @@ public:
 	bool NeedsTempVariable() const final
 	{
 		return false;
+	}
+
+	bool IsCustom() const final
+	{
+		return true;
+	}
+
+	rs::ICustomPropertyResolvePolicy* GetPolicy() const
+	{
+		return m_policy;
 	}
 
 private:

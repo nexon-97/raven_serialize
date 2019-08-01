@@ -155,6 +155,7 @@ public:
 	template <typename Signature>
 	Type& DeclProperty(const char* name, Signature signature)
 	{
+		static_assert(std::is_member_object_pointer<Signature>::value, "Signature must be member object pointer!");
 		using T = typename ExtractClassType<Signature>::type;
 
 		auto property = std::make_shared<MemberProperty<T, typename ExtractValueType<Signature>::type, Signature>>(name, signature);
