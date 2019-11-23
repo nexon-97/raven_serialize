@@ -414,7 +414,16 @@ rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
 				}
 				else
 				{
-					return rttr::Reflect(typeId.c_str());
+					rttr::Type reflectedType = rttr::Reflect(typeId.c_str());
+
+					if (reflectedType.IsValid())
+					{
+						return reflectedType;
+					}
+					else
+					{
+						return rttr::Reflect<nullptr_t>();
+					}
 				}
 			}
 			else
