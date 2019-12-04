@@ -151,25 +151,17 @@ public:
 	RAVEN_SER_API void* Instantiate() const;
 	void RAVEN_SER_API Destroy(void* object) const;
 
-	/*TaskHandle EnqueueTask(Args&&... args)
-	{
-		static_assert(std::is_base_of<Task, TaskType>::value, "Task type must be derived from Task!");
-
-		std::shared_ptr<Task> taskInstance = std::make_shared<TaskType>(std::forward<Args>(args)...);
-		*return DoEnqueueTask(taskInstance);
-	}*/
-
 	template <class BaseType, typename ...Args>
 	std::unique_ptr<BaseType> CreateUniqueInstance(Args&&... args)
 	{
 		if (m_typeData->constructors.empty())
 		{
-			return nullptr;
+			return std::unique_ptr<BaseType>();
 		}
 		else
 		{
-			void* instance = m_typeData->constructors[0]->Construct(nullptr);
-			return nullptr;
+			std::unique_ptr<BaseType> instance = m_typeData->constructors[0]->ConstructUnique<BaseType>(nullptr);
+			return instance;
 		}
 	}
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "raven_serialize.hpp"
 #include <tuple>
+#include <memory>
 
 namespace rttr
 {
@@ -17,24 +18,21 @@ public:
 
 	virtual void* Construct(void* paramsData) = 0;
 
+	template <class BaseClass>
+	std::unique_ptr<BaseClass> ConstructUnique(void* paramsData)
+	{
+		BaseClass* instance = static_cast<BaseClass*>(Construct(paramsData));
+		return std::unique_ptr<BaseClass>(instance);
+	}
+
+	virtual std::shared_ptr<void> ConstructShared(void* paramsData) = 0;
+
 protected:
 	Type* m_argTypes = nullptr;
 	int m_argsCount = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////
-
-/*template <typename T, typename ...Args>
-std::unique_ptr<T> CreateUniqueInstanceWithArgs(Args&&... args)
-{
-	static UniqueInstanceConstructor<T, Args> instanceConstructor;
-	return instanceConstructor.Construct(std::forward<Args>(args)...);*/
-
-template <class T, typename ...Args>
-T* NewWrapper(Args&&... args)
-{
-	return new T(std::forward(args)...);
-}
 
 template <class T, typename ...Args>
 class ConcreteConstructor
@@ -48,20 +46,15 @@ public:
 	void* Construct(void* paramsData) override
 	{
 		std::tuple<Args...>* parametersTuple = reinterpret_cast<std::tuple<Args...>*>(paramsData);
-		/*std::size_t currentArgOffset = 0;
+		//T* instance = std::apply(NewWrapper<T, Args...>, *parametersTuple);
 
-		for (int paramIdx = 0; paramIdx < m_argsCount; ++paramIdx)
-		{
-			std::size_t argSize = m_argTypes[paramIdx].GetSize();
-			
-			
-			currentArgOffset += argSize;
-		}
+		return new T();
+	}
 
-		std::tuple<Args...> parameters;*/
-		T* instance = std::apply(NewWrapper<T, Args...>, *parametersTuple);
-
-		return instance;
+	std::shared_ptr<void> ConstructShared(void* paramsData) override
+	{
+		std::tuple<Args...>* parametersTuple = reinterpret_cast<std::tuple<Args...>*>(paramsData);
+		return std::make_shared<T>();
 	}
 };
 
