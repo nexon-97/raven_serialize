@@ -15,6 +15,46 @@ type_data::type_data(const TypeClass typeClass, const char* name
 	, typeClass(typeClass)
 {}
 
+type_data::type_data(type_data&& other)
+	: typeClass(other.typeClass)
+	, name(other.name)
+	, id(other.id)
+	, size(other.size)
+	, typeIndex(other.typeIndex)
+	, isIntegral(other.isIntegral)
+	, isFloat(other.isFloat)
+	, isArray(other.isArray)
+	, isEnum(other.isEnum)
+	, isClass(other.isClass)
+	, isFunction(other.isFunction)
+	, isPointer(other.isPointer)
+	, isSmartPointer(other.isSmartPointer)
+	, isMemberObjPointer(other.isMemberObjPointer)
+	, isMemberFuncPointer(other.isMemberFuncPointer)
+	, isConst(other.isConst)
+	, isSigned(other.isSigned)
+	, isString(other.isString)
+	, isUserDefined(other.isUserDefined)
+	, arrayRank(other.arrayRank)
+	, arrayTraits(other.arrayTraits)
+	, smartptrParams(other.smartptrParams)
+	, dynamicArrayParams(other.dynamicArrayParams)
+	, arrayExtents(std::move(other.arrayExtents))
+	, properties(std::move(other.properties))
+	, constructors(std::move(other.constructors))
+	, instanceAllocator(other.instanceAllocator)
+	, instanceDestructor(other.instanceDestructor)
+	, pointerTypeIndexResolverFunc(other.pointerTypeIndexResolverFunc)
+	, smartPtrValueResolver(other.smartPtrValueResolver)
+	, debugValueViewer(other.debugValueViewer)
+{
+	memcpy_s(underlyingType, sizeof(Type*) * 2, other.underlyingType, sizeof(Type*) * 2);
+}
+
+Type::Type()
+	: m_typeData(nullptr)
+{}
+
 Type::Type(type_data* typeData)
 	: m_typeData(typeData)
 {}

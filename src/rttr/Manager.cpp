@@ -33,7 +33,7 @@ Type Manager::GetMetaTypeByTypeIndex(const std::type_index& typeIndex)
 	auto it = m_types.find(typeIndex);
 	if (it != m_types.end())
 	{
-		return Type(&it->second);
+		return Type(it->second.get());
 	}
 
 	return Type(nullptr);

@@ -1,5 +1,6 @@
 #pragma once
 #include "helper/TypeTraitsExtension.hpp"
+#include "rttr/Constructor.hpp"
 #include "raven_serialize.hpp"
 
 #include <unordered_map>
@@ -92,6 +93,7 @@ struct type_data
 	Type* underlyingType[2];
 	std::shared_ptr<std::size_t> arrayExtents;
 	std::vector<std::shared_ptr<Property>> properties;
+	std::vector<std::unique_ptr<Constructor>> constructors;
 	MetaTypeInstanceAllocator instanceAllocator;
 	MetaTypeInstanceDestructor instanceDestructor;
 	PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
@@ -100,11 +102,16 @@ struct type_data
 
 	RAVEN_SER_API type_data(const TypeClass typeClass, const char* name
 		, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept;
+
+	type_data(const type_data&) = delete;
+	type_data& operator=(const type_data&) = delete;
+	RAVEN_SER_API type_data(type_data&&);
 };
 
 class Type
 {
 public:
+	RAVEN_SER_API Type();
 	RAVEN_SER_API Type(type_data* typeData);
 
 	RAVEN_SER_API const char* GetName() const;
@@ -144,6 +151,28 @@ public:
 	RAVEN_SER_API void* Instantiate() const;
 	void RAVEN_SER_API Destroy(void* object) const;
 
+	/*TaskHandle EnqueueTask(Args&&... args)
+	{
+		static_assert(std::is_base_of<Task, TaskType>::value, "Task type must be derived from Task!");
+
+		std::shared_ptr<Task> taskInstance = std::make_shared<TaskType>(std::forward<Args>(args)...);
+		*return DoEnqueueTask(taskInstance);
+	}*/
+
+	template <class BaseType, typename ...Args>
+	std::unique_ptr<BaseType> CreateUniqueInstance(Args&&... args)
+	{
+		if (m_typeData->constructors.empty())
+		{
+			return nullptr;
+		}
+		else
+		{
+			void* instance = m_typeData->constructors[0]->Construct(nullptr);
+			return nullptr;
+		}
+	}
+
 	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
 	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
 	RAVEN_SER_API const char* GetSmartPtrTypeName() const;
@@ -151,6 +180,19 @@ public:
 
 	bool RAVEN_SER_API operator==(const Type& other) const;
 	bool RAVEN_SER_API operator!=(const Type& other) const;
+
+	template <typename T, typename ...ConstructorArgs>
+	Type& DeclConstructor(ConstructorArgs&&... constructorArgs)
+	{
+		static_assert(std::is_constructible<T, ConstructorArgs...>::value, "Must provide a valid constructor signature!");
+
+		std::vector<Type> argTypes;
+
+		auto constructor = std::make_unique<ConcreteConstructor<T, ConstructorArgs...>>(argTypes.data(), static_cast<int>(argTypes.size()));
+		m_typeData->constructors.push_back(std::move(constructor));
+
+		return *this;
+	}
 
 	template <typename Signature>
 	Type& DeclProperty(const char* name, Signature signature)

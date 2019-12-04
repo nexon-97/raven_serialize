@@ -278,6 +278,60 @@ const void* DebugValueViewerF(const void* value)
 	return realValuePtr;
 };
 
+/*std::shared_ptr<Type> CreateSharedInstance(Args&&... args)
+{
+	assert(typeid(Type) == m_typeData->typeIndex);
+
+	std::shared_ptr<Type> instance = std::make_shared<Type>(std::forward<Args>(args)...);
+	return instance;
+}*/
+
+//struct BaseUniqueInstanceConstructor
+//{
+//	virtual std::unique_ptr<void> Construct()
+//	{
+//		return nullptr;
+//	}
+//};
+//
+//template <typename ...Args>
+//struct UniqueInstanceConstructor
+//	: public BaseUniqueInstanceConstructor
+//{
+//	UniqueInstanceConstructor()
+//	{
+//
+//	}
+//
+//	std::unique_ptr<void> DoConstruct(Args&&... args)
+//	{
+//		return std::make_unique<T>(std::forward<Args>(args)...);
+//	}
+//
+//	std::unique_ptr<void> Construct(Args&&... args) override
+//	{
+//		return nullptr;
+//	}
+//};
+//
+//template <typename T, typename ...Args>
+//struct UniqueInstanceConstructor
+//{
+//	std::unique_ptr<T> Construct(Args&&... args)
+//	{
+//		return std::make_unique<T>(std::forward<Args>(args)...);
+//	}
+//};
+//
+//// Have constructor instances, need a way to construct
+//
+//template <typename T, typename ...Args>
+//std::unique_ptr<T> CreateUniqueInstanceWithArgs(Args&&... args)
+//{
+//	static UniqueInstanceConstructor<T, Args> instanceConstructor;
+//	return instanceConstructor.Construct(std::forward<Args>(args)...);
+//}
+
 ////////////////////////////////////////////////////////////////////////////////////
 
 class Manager
@@ -297,54 +351,49 @@ public:
 		if (it == m_types.end())
 		{
 			const char* typeName = (nullptr != name) ? name : typeid(T).name();
-			type_data i_metaTypeData(TypeClassResolver<T>()(), typeName, m_nextId, sizeof(T), typeid(T));
+			std::unique_ptr<type_data> i_metaTypeData = std::make_unique<type_data>(TypeClassResolver<T>()(), typeName, m_nextId, sizeof(T), typeid(T));
+			type_data* typeDataRawPtr = i_metaTypeData.get();
+			m_types.emplace(typeid(T), std::move(i_metaTypeData));
 			++m_nextId;
 
-			auto emplaceResult = m_types.emplace(typeid(T), i_metaTypeData);
-			type_data& metaTypeData = emplaceResult.first->second;
-			m_typeNames.emplace(typeName, &metaTypeData);
+			m_typeNames.emplace(typeName, typeDataRawPtr);
 
-			FillMetaTypeData<T>(metaTypeData);
-
-			metaTypeData.instanceAllocator = allocator;
-			metaTypeData.instanceDestructor = DefaultInstanceDestructor<T>();
+			FillMetaTypeData<T>(*typeDataRawPtr);
+			typeDataRawPtr->instanceAllocator = allocator;
+			typeDataRawPtr->instanceDestructor = DefaultInstanceDestructor<T>();
 			
-			Type typeWrapper(&(emplaceResult.first->second));
+			Type typeWrapper(typeDataRawPtr);
 
-			rs::Log::LogMessage(std::string("Meta type registered: ") + metaTypeData.name);
+			rs::Log::LogMessage(std::string("Meta type registered: ") + typeDataRawPtr->name);
 
 			return typeWrapper;
 		}
 		else
 		{
+			type_data* metaTypeDataPtr = it->second.get();
+
 			if (userDefined)
 			{
-				type_data& metaTypeData = it->second;
-
 				if (nullptr != name)
 				{
 					// Remove old registered name from lookup table
-					auto nameIt = m_typeNames.find(metaTypeData.name);
+					auto nameIt = m_typeNames.find(metaTypeDataPtr->name);
 					if (nameIt != m_typeNames.end())
 					{
 						m_typeNames.erase(nameIt);
 					}
 
-					metaTypeData.name = name;
-					m_typeNames.emplace(name, &metaTypeData);
+					metaTypeDataPtr->name = name;
+					m_typeNames.emplace(name, metaTypeDataPtr);
 				}
 
-				if (!metaTypeData.isUserDefined)
-				{
-					metaTypeData.isUserDefined = true;
-				}
+				metaTypeDataPtr->isUserDefined = true;
+				metaTypeDataPtr->instanceAllocator = allocator;
 
-				metaTypeData.instanceAllocator = allocator;
-
-				rs::Log::LogMessage(std::string("Meta type registered: ") + metaTypeData.name);
+				rs::Log::LogMessage(std::string("Meta type registered: ") + metaTypeDataPtr->name);
 			}
 
-			return Type(&(it->second));
+			return Type(metaTypeDataPtr);
 		}
 	}
 
@@ -410,7 +459,7 @@ public:
 	static RAVEN_SER_API Manager& GetRTTRManager();
 
 private:
-	std::unordered_map<std::type_index, type_data> m_types;
+	std::unordered_map<std::type_index, std::unique_ptr<type_data>> m_types;
 	std::unordered_map<std::string, type_data*> m_typeNames;
 	std::size_t m_nextId = 0U;
 };
