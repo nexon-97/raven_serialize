@@ -19,6 +19,8 @@ project "raven_serialize"
 		excludes { "../src/examples/**", "../src/jsoncpp/**" }
 		links { "jsoncpp" }
 		includedirs { EngineRootLocation.."/framework/core/jsoncpp/include", }
+	else
+		includedirs { EngineRootLocation.."/src/jsoncpp/include", }
 	end
 
 	targetdir(EngineRootLocation.."/bin")

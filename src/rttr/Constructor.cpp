@@ -28,4 +28,22 @@ Constructor::~Constructor()
 	}
 }
 
+bool Constructor::operator==(const Constructor& other) const
+{
+	if (m_argsCount == other.m_argsCount)
+	{
+		for (int i = 0; i < m_argsCount; ++i)
+		{
+			if (m_argTypes[i] != other.m_argTypes[i])
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 }

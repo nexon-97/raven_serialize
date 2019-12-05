@@ -1,11 +1,6 @@
-#include "Serializer.hpp"
-#include "Deserializer.hpp"
-
 #include "rttr/Property.hpp"
 #include "rttr/Manager.hpp"
-
-#include "writers/JsonWriter.hpp"
-#include "writers/JsonReader.hpp"
+#include "rttr/Constructor.hpp"
 
 #include <fstream>
 
@@ -14,7 +9,19 @@ struct Vector3
 	float x = 0.f;
 	float y = 0.f;
 	float z = 0.f;
-	bool someBoolVar = true;
+	
+	Vector3() = default;
+	Vector3(float value)
+		: x(value)
+		, y(value)
+		, z(value)
+	{}
+
+	Vector3(float x, float y, float z)
+		: x(x)
+		, y(y)
+		, z(z)
+	{}
 };
 
 struct Quaternion
@@ -23,6 +30,20 @@ struct Quaternion
 	float y = 0.f;
 	float z = 0.f;
 	float w = 0.f;
+
+	Quaternion()
+		: x(0.f)
+		, y(0.f)
+		, z(0.f)
+		, w(1.f)
+	{}
+
+	Quaternion(float x, float y, float z, float w)
+		: x(x)
+		, y(y)
+		, z(z)
+		, w(w)
+	{}
 };
 
 struct TestStruct
@@ -34,6 +55,14 @@ struct TestStruct
 	std::string timestamp;
 	std::vector<int> vec;
 	int somevec[15];
+
+	TestStruct(int a, const Vector3& v1, const Quaternion& q, const std::string& timestamp)
+		: a(a)
+		, position(v1)
+		, rotation(q)
+		, timestamp(timestamp)
+		, scale(Vector3(1.f))
+	{}
 
 	void SetA(const int value)
 	{
@@ -64,12 +93,17 @@ int main()
 	value.somevec[6] = -92;*/
 
 	rttr::MetaType<Vector3>("Vector3")
+		.DeclConstructor<Vector3>()
+		.DeclConstructor<Vector3, float>()
+		.DeclConstructor<Vector3, float, float, float>()
 		.DeclProperty("x", &Vector3::x)
 		.DeclProperty("y", &Vector3::y)
 		.DeclProperty("z", &Vector3::z)
-		.DeclProperty("someBoolVar", &Vector3::someBoolVar);
+		;
 
 	rttr::MetaType<Quaternion>("Quaternion")
+		.DeclConstructor<Quaternion>()
+		.DeclConstructor<Quaternion, float, float, float, float>()
 		.DeclProperty("x", &Quaternion::x)
 		.DeclProperty("y", &Quaternion::y)
 		.DeclProperty("z", &Quaternion::z)
@@ -82,18 +116,16 @@ int main()
 		.DeclProperty("rotation", &TestStruct::rotation)
 		.DeclProperty("timestamp", &TestStruct::timestamp)
 		.DeclProperty("vec", &TestStruct::vec)
-		//.DeclProperty("somevec", &TestStruct::somevec)
 		;
 
-	/*serializer.Write(value);
-	stream.flush();
-	stream.close();*/
-
-	std::ifstream istream("test.json");
-	raven::Deserializer<JsonReader> deserializer(istream);
-
-	TestStruct readValue;
-	deserializer.Read(readValue);
+	rttr::Type reflectedVec3Type = rttr::Reflect("Vector3");
+	if (reflectedVec3Type.IsValid())
+	{
+		std::unique_ptr<Vector3> testVecInstance = reflectedVec3Type.CreateUniqueInstance<Vector3>(25.f, 10.f, -30.f);
+		Vector3* heapInstance = reflectedVec3Type.CreateHeapInstance<Vector3>(125.f, 120.f, -230.f);
+		std::shared_ptr<Vector3> sharedVector = reflectedVec3Type.CreateSharedInstance<Vector3>(325.f, -180.f, 530.f);
+		int a = 0;
+	}
 
 	return 0;
 }

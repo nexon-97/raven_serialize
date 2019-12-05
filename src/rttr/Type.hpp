@@ -45,6 +45,9 @@ struct DynamicArrayParams
 	ArrayGetItemFunc getItemFunc;
 };
 
+template <typename ...Args>
+std::vector<Type> ReflectArgTypes();
+
 enum class TypeClass
 {
 	Invalid,
@@ -151,19 +154,63 @@ public:
 	RAVEN_SER_API void* Instantiate() const;
 	void RAVEN_SER_API Destroy(void* object) const;
 
+	// =================================================================================================
+	// Constructors implementation
+
 	template <class BaseType, typename ...Args>
 	std::unique_ptr<BaseType> CreateUniqueInstance(Args&&... args)
 	{
-		if (m_typeData->constructors.empty())
+		std::vector<Type> argTypes = ReflectArgTypes<Args...>();
+		Constructor* constructor = GetConstructorByArgTypes(argTypes);
+		assert(nullptr != constructor);
+
+		if (nullptr != constructor)
 		{
-			return std::unique_ptr<BaseType>();
-		}
-		else
-		{
-			std::unique_ptr<BaseType> instance = m_typeData->constructors[0]->ConstructUnique<BaseType>(nullptr);
+			std::tuple<Args...> paramsTuple = std::forward_as_tuple(args...);
+			std::unique_ptr<BaseType> instance = constructor->ConstructUnique<BaseType>(&paramsTuple);
 			return instance;
 		}
+		
+		return std::unique_ptr<BaseType>();
 	}
+
+	template <class BaseType, typename ...Args>
+	std::shared_ptr<BaseType> CreateSharedInstance(Args&&... args)
+	{
+		std::vector<Type> argTypes = ReflectArgTypes<Args...>();
+		Constructor* constructor = GetConstructorByArgTypes(argTypes);
+		assert(nullptr != constructor);
+
+		if (nullptr != constructor)
+		{
+			std::tuple<Args...> paramsTuple = std::forward_as_tuple(args...);
+			std::shared_ptr<BaseType> instance = std::static_pointer_cast<BaseType>(constructor->ConstructShared(&paramsTuple));
+			return instance;
+		}
+
+		return std::unique_ptr<BaseType>();
+	}
+
+	template <class BaseType, typename ...Args>
+	BaseType* CreateHeapInstance(Args&&... args)
+	{
+		std::vector<Type> argTypes = ReflectArgTypes<Args...>();
+		Constructor* constructor = GetConstructorByArgTypes(argTypes);
+		assert(nullptr != constructor);
+
+		if (nullptr != constructor)
+		{
+			std::tuple<Args...> paramsTuple = std::forward_as_tuple(args...);
+			BaseType* instance = static_cast<BaseType*>(constructor->Construct(&paramsTuple));
+			return instance;
+		}
+
+		return nullptr;
+	}
+
+	// =================================================================================================
+
+	RAVEN_SER_API Constructor* GetConstructorByArgTypes(const std::vector<Type>& argTypes) const;
 
 	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
 	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
@@ -174,13 +221,23 @@ public:
 	bool RAVEN_SER_API operator!=(const Type& other) const;
 
 	template <typename T, typename ...ConstructorArgs>
-	Type& DeclConstructor(ConstructorArgs&&... constructorArgs)
+	Type& DeclConstructor()
 	{
 		static_assert(std::is_constructible<T, ConstructorArgs...>::value, "Must provide a valid constructor signature!");
 
-		std::vector<Type> argTypes;
-
+		std::vector<Type> argTypes = ReflectArgTypes<ConstructorArgs...>();
 		auto constructor = std::make_unique<ConcreteConstructor<T, ConstructorArgs...>>(argTypes.data(), static_cast<int>(argTypes.size()));
+
+		// Check for constructor duplicates
+		{
+			auto predicate = [&constructor](const std::unique_ptr<Constructor>& item) -> bool
+			{
+				return (*item == *constructor);
+			};
+			auto it = std::find_if(m_typeData->constructors.begin(), m_typeData->constructors.end(), predicate);
+			assert(it == m_typeData->constructors.end());
+		}
+		
 		m_typeData->constructors.push_back(std::move(constructor));
 
 		return *this;
@@ -229,5 +286,14 @@ private:
 private:
 	type_data* m_typeData = nullptr;
 };
+
+template <typename ...Args>
+std::vector<Type> ReflectArgTypes()
+{
+	std::vector<Type> argTypes;
+	(argTypes.push_back(Reflect<Args>()), ...);
+
+	return argTypes;
+}
 
 } // namespace rttr

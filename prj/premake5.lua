@@ -17,7 +17,7 @@ SerializationStandalone = true
 EngineRootLocation = path.getabsolute("../")
 
 workspace "raven_serialize"
-	configurations { "Debug", "Release" }
+	configurations { "Debug", "Development", "Release" }
 	platforms { "x64" }
 	cppdialect("c++17")
 

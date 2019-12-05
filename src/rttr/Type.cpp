@@ -376,4 +376,25 @@ Type& Type::DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* pol
 	return *this;
 }
 
+Constructor* Type::GetConstructorByArgTypes(const std::vector<Type>& argTypes) const
+{
+	for (const std::unique_ptr<Constructor>& constructor : m_typeData->constructors)
+	{
+		if (argTypes.size() != constructor->m_argsCount)
+			continue;
+
+		for (int i = 0; i < constructor->m_argsCount; ++i)
+		{
+			if (constructor->m_argTypes[i] != argTypes[i])
+			{
+				continue;
+			}
+		}
+
+		return constructor.get();
+	}
+
+	return nullptr;
+}
+
 } // namespace rttr
