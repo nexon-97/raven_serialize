@@ -119,11 +119,12 @@ int main()
 		;
 
 	rttr::Type reflectedVec3Type = rttr::Reflect("Vector3");
+	rttr::Type reflectedQuatType = rttr::Reflect("Quaternion");
 	if (reflectedVec3Type.IsValid())
 	{
 		std::unique_ptr<Vector3> testVecInstance = reflectedVec3Type.CreateUniqueInstance<Vector3>(25.f, 10.f, -30.f);
 		Vector3* heapInstance = reflectedVec3Type.CreateHeapInstance<Vector3>(125.f, 120.f, -230.f);
-		std::shared_ptr<Vector3> sharedVector = reflectedVec3Type.CreateSharedInstance<Vector3>(325.f, -180.f, 530.f);
+		std::shared_ptr<Quaternion> sharedQuat = reflectedQuatType.CreateSharedInstance<Quaternion>();
 		int a = 0;
 	}
 

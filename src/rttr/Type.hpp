@@ -160,18 +160,7 @@ public:
 	template <class BaseType, typename ...Args>
 	std::unique_ptr<BaseType> CreateUniqueInstance(Args&&... args)
 	{
-		std::vector<Type> argTypes = ReflectArgTypes<Args...>();
-		Constructor* constructor = GetConstructorByArgTypes(argTypes);
-		assert(nullptr != constructor);
-
-		if (nullptr != constructor)
-		{
-			std::tuple<Args...> paramsTuple = std::forward_as_tuple(args...);
-			std::unique_ptr<BaseType> instance = constructor->ConstructUnique<BaseType>(&paramsTuple);
-			return instance;
-		}
-		
-		return std::unique_ptr<BaseType>();
+		return std::unique_ptr<BaseType>(CreateHeapInstance<BaseType>(std::forward<Args>(args)...));
 	}
 
 	template <class BaseType, typename ...Args>
@@ -224,6 +213,7 @@ public:
 	Type& DeclConstructor()
 	{
 		static_assert(std::is_constructible<T, ConstructorArgs...>::value, "Must provide a valid constructor signature!");
+		assert(std::type_index(typeid(T)) == m_typeData->typeIndex);
 
 		std::vector<Type> argTypes = ReflectArgTypes<ConstructorArgs...>();
 		auto constructor = std::make_unique<ConcreteConstructor<T, ConstructorArgs...>>(argTypes.data(), static_cast<int>(argTypes.size()));

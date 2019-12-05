@@ -17,14 +17,6 @@ public:
 	RAVEN_SER_API ~Constructor();
 
 	virtual void* Construct(void* paramsData) = 0;
-
-	template <class BaseClass>
-	std::unique_ptr<BaseClass> ConstructUnique(void* paramsData)
-	{
-		BaseClass* instance = static_cast<BaseClass*>(Construct(paramsData));
-		return std::unique_ptr<BaseClass>(instance);
-	}
-
 	virtual std::shared_ptr<void> ConstructShared(void* paramsData) = 0;
 
 	bool RAVEN_SER_API operator==(const Constructor& other) const;
