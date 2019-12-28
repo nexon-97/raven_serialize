@@ -7,6 +7,12 @@
 #include <memory>
 #include <json/json.h>
 
+namespace rttr
+{
+template <typename T>
+Type Reflect();
+}
+
 namespace rs
 {
 

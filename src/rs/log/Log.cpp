@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <cstdarg>
+#include <cstring>
 
 namespace rs
 {

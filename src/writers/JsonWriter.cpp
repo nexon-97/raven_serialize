@@ -258,8 +258,9 @@ void JsonWriter::WriteCustomObject(CustomObjectWriterFunc* objectWritersPtr, con
 
 std::string JsonWriter::WStringToUtf8(const wchar_t* _literal)
 {
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-	std::string utf8String = converter.to_bytes(_literal);
+	//std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+	//std::string utf8String = converter.to_bytes(_literal);
+	std::string utf8String;
 
 	return utf8String;
 }
