@@ -1,5 +1,6 @@
 #pragma once
 #include "rttr/Type.hpp"
+#include "rttr/Property.hpp"
 #include "helper/TypeTraitsExtension.hpp"
 #include "raven_serialize.hpp"
 #include "rs/log/Log.hpp"
@@ -12,6 +13,9 @@
 
 namespace rttr
 {
+
+template <typename T>
+Type Reflect();
 
 template <typename T, std::size_t ...Is>
 void FillArrayExtentImpl(std::size_t* arrayExtents, std::index_sequence<Is...>)
@@ -85,7 +89,7 @@ std::type_index GetTypeIndexFromPointerType(void* value)
 		return typeid(*ptrValue);
 	}
 	
-	return typeid(std::remove_pointer<T>::type);
+	return typeid(typename std::remove_pointer<T>::type);
 }
 
 template <typename T>
@@ -167,7 +171,7 @@ template <typename T>
 void AssignSmartptrValue(void* smartptr, void* value)
 {
 	T* smartPtrCasted = reinterpret_cast<T*>(smartptr);
-	auto dataPtr = reinterpret_cast<std::add_pointer<std::pointer_traits<T>::element_type>::type>(value);
+	auto dataPtr = reinterpret_cast<typename std::add_pointer<typename std::pointer_traits<T>::element_type>::type>(value);
 	smartPtrCasted->reset(dataPtr);
 }
 
@@ -178,7 +182,7 @@ struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
 	{
 		metaTypeData.arrayRank = 1U;
 		metaTypeData.arrayTraits.isStdVector = true;
-		metaTypeData.underlyingType[0] = new Type(Reflect<std_vector_type<T>::type>());
+		metaTypeData.underlyingType[0] = new Type(Reflect<typename std_vector_type<T>::type>());
 
 		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
 		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
@@ -199,7 +203,7 @@ struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value>>
 	{
 		metaTypeData.arrayRank = std::rank<T>::value;
 		metaTypeData.arrayTraits.isSimpleArray = true;
-		metaTypeData.underlyingType[0] = new Type(Reflect<std::remove_all_extents_t<T>>());
+		metaTypeData.underlyingType[0] = new Type(Reflect<typename std::remove_all_extents_t<T>>());
 
 		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
 		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
@@ -228,7 +232,7 @@ struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
 		smartptrParams.smartptrTypeName = smart_ptr_type_name_resolver<T>()();
 		smartptrParams.valueAssignFunc = AssignSmartptrValue<T>;
 
-		metaTypeData.underlyingType[0] = new Type(Reflect<smart_ptr_type<T>::type>());
+		metaTypeData.underlyingType[0] = new Type(Reflect<typename smart_ptr_type<T>::type>());
 		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
 		metaTypeData.smartptrParams = &smartptrParams;
 	}
@@ -245,7 +249,7 @@ struct PointerTraitsResolver<T, std::enable_if_t<std::is_pointer<T>::value>>
 {
 	PointerTraitsResolver(type_data& metaTypeData)
 	{
-		metaTypeData.underlyingType[0] = new Type(Reflect<std::pointer_traits<T>::element_type>());
+		metaTypeData.underlyingType[0] = new Type(Reflect<typename std::pointer_traits<T>::element_type>());
 		metaTypeData.pointerTypeIndexResolverFunc = GetTypeIndexFromPointerType<T>;
 	}
 };
@@ -261,7 +265,7 @@ struct EnumTraitsResolver<T, std::enable_if_t<std::is_enum<T>::value>>
 {
 	EnumTraitsResolver(type_data& metaTypeData)
 	{
-		metaTypeData.underlyingType[0] = new Type(Reflect<std::underlying_type<T>::type>());
+		metaTypeData.underlyingType[0] = new Type(Reflect<typename std::underlying_type<T>::type>());
 	}
 };
 
@@ -278,59 +282,24 @@ const void* DebugValueViewerF(const void* value)
 	return realValuePtr;
 };
 
-/*std::shared_ptr<Type> CreateSharedInstance(Args&&... args)
+template <typename Signature>
+std::shared_ptr<Property> CreateMemberProperty(const char* name, Signature signature)
 {
-	assert(typeid(Type) == m_typeData->typeIndex);
+	using T = typename ExtractClassType<Signature>::type;
+	using ValueType = typename ExtractValueType<Signature>::type;
 
-	std::shared_ptr<Type> instance = std::make_shared<Type>(std::forward<Args>(args)...);
-	return instance;
-}*/
+	return std::make_shared<MemberProperty<T, ValueType, Signature>>(name, signature, Reflect<ValueType>());
+}
 
-//struct BaseUniqueInstanceConstructor
-//{
-//	virtual std::unique_ptr<void> Construct()
-//	{
-//		return nullptr;
-//	}
-//};
-//
-//template <typename ...Args>
-//struct UniqueInstanceConstructor
-//	: public BaseUniqueInstanceConstructor
-//{
-//	UniqueInstanceConstructor()
-//	{
-//
-//	}
-//
-//	std::unique_ptr<void> DoConstruct(Args&&... args)
-//	{
-//		return std::make_unique<T>(std::forward<Args>(args)...);
-//	}
-//
-//	std::unique_ptr<void> Construct(Args&&... args) override
-//	{
-//		return nullptr;
-//	}
-//};
-//
-//template <typename T, typename ...Args>
-//struct UniqueInstanceConstructor
-//{
-//	std::unique_ptr<T> Construct(Args&&... args)
-//	{
-//		return std::make_unique<T>(std::forward<Args>(args)...);
-//	}
-//};
-//
-//// Have constructor instances, need a way to construct
-//
-//template <typename T, typename ...Args>
-//std::unique_ptr<T> CreateUniqueInstanceWithArgs(Args&&... args)
-//{
-//	static UniqueInstanceConstructor<T, Args> instanceConstructor;
-//	return instanceConstructor.Construct(std::forward<Args>(args)...);
-//}
+template <typename GetterSignature, typename SetterSignature>
+std::shared_ptr<Property> CreateIndirectProperty(const char* name, GetterSignature getter, SetterSignature setter)
+{
+	static_assert(std::is_same<typename ExtractValueType<GetterSignature>::type, typename ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
+	using ValueType = typename ExtractValueType<GetterSignature>::type;	
+	using T = typename ExtractClassType<GetterSignature>::type;
+
+	return std::make_shared<IndirectProperty<T, ValueType, GetterSignature, SetterSignature>>(name, getter, setter, Reflect<ValueType>());
+}
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -439,22 +408,6 @@ public:
 
 	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
 	Type RAVEN_SER_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
-
-	template <typename Signature>
-	static std::shared_ptr<Property> CreateProperty(Signature signature)
-	{
-		using T = typename ExtractClassType<Signature>::type;
-		return std::make_shared<MemberProperty<T, typename ExtractValueType<Signature>::type, Signature>>("", signature);
-	}
-
-	template <typename GetterSignature, typename SetterSignature>
-	static std::shared_ptr<Property> CreateProperty(GetterSignature getter, SetterSignature setter)
-	{
-		static_assert(std::is_same<ExtractValueType<GetterSignature>::type, ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
-		
-		using T = typename ExtractClassType<GetterSignature>::type;
-		return std::make_shared<IndirectProperty<T, typename ExtractValueType<GetterSignature>::type, GetterSignature, SetterSignature>>(name, getter, setter);
-	}
 
 	static RAVEN_SER_API Manager& GetRTTRManager();
 

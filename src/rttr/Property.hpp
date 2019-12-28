@@ -2,12 +2,16 @@
 #include "rttr/Aliases.hpp"
 #include "rttr/helper/TypeTraitsExtension.hpp"
 #include "rttr/Type.hpp"
-#include "rttr/Manager.hpp"
-#include "rs/ICustomPropertyResolvePolicy.hpp"
+
 #include <unordered_map>
 #include <string>
 #include <typeindex>
 #include <cassert>
+
+namespace rs
+{
+class ICustomPropertyResolvePolicy;
+}
 
 namespace rttr
 {
@@ -51,8 +55,8 @@ class MemberProperty
 	: public Property
 {
 public:
-	MemberProperty(const char* name, SignatureType signature)
-		: Property(name, Reflect<ValueType>())
+	MemberProperty(const char* name, SignatureType signature, const Type& type)
+		: Property(name, type)
 		, m_signature(signature)
 	{}
 
@@ -120,8 +124,8 @@ class IndirectProperty
 	: public Property
 {
 public:
-	IndirectProperty(const char* name, GetterSignature getterSignature, SetterSignature setterSignature)
-		: Property(name, Reflect<ValueType>())
+	IndirectProperty(const char* name, GetterSignature getterSignature, SetterSignature setterSignature, const Type& type)
+		: Property(name, type)
 		, m_getterSignature(getterSignature)
 		, m_setterSignature(setterSignature)
 	{}
@@ -183,8 +187,8 @@ class CustomProperty
 	: public Property
 {
 public:
-	CustomProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
-		: Property(name, policy->GetType())
+	CustomProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy, const Type& type)
+		: Property(name, type)
 		, m_policy(policy)
 	{}
 

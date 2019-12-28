@@ -22,6 +22,11 @@ namespace rttr
 class Property;
 class Type;
 
+template <typename Signature>
+std::shared_ptr<Property> CreateMemberProperty(const char* name, Signature signature);
+template <typename GetterSignature, typename SetterSignature>
+std::shared_ptr<Property> CreateIndirectProperty(const char* name, GetterSignature getter, SetterSignature setter);
+
 using MetaTypeInstanceAllocator = std::function<void*()>;
 using MetaTypeInstanceDestructor = std::function<void(void*)>;
 using PointerTypeIndexResolverFunc = std::function<std::type_index(void*)>;
@@ -189,13 +194,8 @@ public:
 	template <typename Signature>
 	Type& DeclProperty(const char* name, Signature signature)
 	{
-		static_assert(std::is_member_object_pointer<Signature>::value, "Signature must be member object pointer!");
-		using T = typename ExtractClassType<Signature>::type;
-
-		auto property = std::make_shared<MemberProperty<T, typename ExtractValueType<Signature>::type, Signature>>(name, signature);
-		std::shared_ptr<Property> baseProperty(std::move(property));
-
-		AddProperty(std::move(baseProperty));
+		std::shared_ptr<Property> property = CreateMemberProperty(name, signature);
+		AddProperty(std::move(property));
 
 		return *this;
 	}
@@ -203,14 +203,8 @@ public:
 	template <typename GetterSignature, typename SetterSignature>
 	Type& DeclProperty(const char* name, GetterSignature getter, SetterSignature setter)
 	{
-		static_assert(std::is_same<ExtractValueType<GetterSignature>::type, ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
-
-		using T = typename ExtractClassType<GetterSignature>::type;
-
-		auto property = std::make_shared<IndirectProperty<T, typename ExtractValueType<GetterSignature>::type, GetterSignature, SetterSignature>>(name, getter, setter);
-		std::shared_ptr<Property> baseProperty(std::move(property));
-
-		AddProperty(std::move(baseProperty));
+		std::shared_ptr<Property> property = CreateIndirectProperty(name, getter, setter);
+		AddProperty(std::move(property));
 
 		return *this;
 	}

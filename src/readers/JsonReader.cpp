@@ -201,8 +201,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			}
 			else if (type.GetTypeIndex() == typeid(std::wstring))
 			{
-				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-				*static_cast<std::wstring*>(value) = converter.from_bytes(strValue);
+				//std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+				//*static_cast<std::wstring*>(value) = converter.from_bytes(strValue);
 			}
 			else if (type.GetTypeIndex() == typeid(const char*))
 			{

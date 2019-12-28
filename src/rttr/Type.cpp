@@ -1,5 +1,6 @@
 #include "rttr/Type.hpp"
 #include "rttr/Property.hpp"
+#include "rs/ICustomPropertyResolvePolicy.hpp"
 
 namespace rttr
 {
@@ -48,7 +49,7 @@ type_data::type_data(type_data&& other)
 	, smartPtrValueResolver(other.smartPtrValueResolver)
 	, debugValueViewer(other.debugValueViewer)
 {
-	memcpy_s(underlyingType, sizeof(Type*) * 2, other.underlyingType, sizeof(Type*) * 2);
+	std::memcpy(underlyingType, other.underlyingType, sizeof(Type*) * 2);
 }
 
 Type::Type()
@@ -370,7 +371,7 @@ const void* Type::DebugViewValue(const void* value) const
 
 Type& Type::DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
 {
-	std::shared_ptr<Property> property = std::make_shared<rttr::CustomProperty>(name, policy);
+	std::shared_ptr<Property> property = std::make_shared<rttr::CustomProperty>(name, policy, policy->GetType());
 	AddProperty(std::move(property));
 
 	return *this;
