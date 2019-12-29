@@ -22,6 +22,8 @@ namespace rttr
 class Property;
 class Type;
 
+template <typename T>
+Type Reflect();
 template <typename Signature>
 std::shared_ptr<Property> CreateMemberProperty(const char* name, Signature signature);
 template <typename GetterSignature, typename SetterSignature>
