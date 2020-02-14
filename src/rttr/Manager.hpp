@@ -2,7 +2,6 @@
 #include "rttr/Type.hpp"
 #include "rttr/Property.hpp"
 #include "helper/TypeTraitsExtension.hpp"
-#include "raven_serialize.hpp"
 #include "rs/log/Log.hpp"
 
 #include <unordered_map>
@@ -148,7 +147,7 @@ void* GetStlCollectionItem(const void* collectionPtr, const std::size_t idx)
 	return const_cast<void*>(reinterpret_cast<const void*>(collection->data() + idx));
 }
 
-void RAVEN_SER_API CollectionResizeNoop(void*, const std::size_t);
+void RAVEN_SERIALIZE_API CollectionResizeNoop(void*, const std::size_t);
 
 template <typename T>
 std::size_t GetStaticArraySize(const void* collectionPtr)
@@ -406,10 +405,10 @@ public:
 		metaTypeData.debugValueViewer = &DebugValueViewerF<T>;
 	}
 
-	Type RAVEN_SER_API GetMetaTypeByName(const char* name);
-	Type RAVEN_SER_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
+	Type RAVEN_SERIALIZE_API GetMetaTypeByName(const char* name);
+	Type RAVEN_SERIALIZE_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
 
-	static RAVEN_SER_API Manager& GetRTTRManager();
+	static RAVEN_SERIALIZE_API Manager& GetRTTRManager();
 
 private:
 	std::unordered_map<std::type_index, std::unique_ptr<type_data>> m_types;
@@ -417,7 +416,7 @@ private:
 	std::size_t m_nextId = 0U;
 };
 
-void RAVEN_SER_API InitRavenSerialization();
+void RAVEN_SERIALIZE_API InitRavenSerialization();
 
 template <typename T>
 Type MetaType(const char* name)
@@ -437,7 +436,7 @@ Type Reflect()
 	return Manager::GetRTTRManager().RegisterMetaType<T>(nullptr, DefaultInstanceAllocator<T>(), false);
 }
 
-Type RAVEN_SER_API Reflect(const char* name);
-Type RAVEN_SER_API Reflect(const std::type_index& typeIndex);
+Type RAVEN_SERIALIZE_API Reflect(const char* name);
+Type RAVEN_SERIALIZE_API Reflect(const std::type_index& typeIndex);
 
 } // namespace rttr

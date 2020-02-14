@@ -1,40 +1,16 @@
-project "raven_serialize"
-	if SerializationStandalone then
-		kind "ConsoleApp"
-	else
-		kind "SharedLib"
-		defines { "RAVEN_SERIALIZE_EXPORTS" }
-	end
-	language "C++"
-	location(_ACTION)
-	cppdialect("c++17")
+local rv_serialize_path = EngineRootLocation.."/framework/core/raven_serialize"
+local rv_serialize_src = rv_serialize_path.."/src"
 
-	files { "../**.cpp", "../**.hpp" }
-	includedirs
-	{
-		"../src",
-	}
-	
-	if not SerializationStandalone then
-		excludes { "../src/examples/**", "../src/jsoncpp/**" }
-		links { "jsoncpp" }
-		includedirs { EngineRootLocation.."/framework/core/jsoncpp/include", }
-	else
-		includedirs { EngineRootLocation.."/src/jsoncpp/include", }
-	end
+local module_definition =
+{
+	["name"] = "raven_serialize",
+	["prj_location"] = rv_serialize_path.."/prj/".._ACTION,
+	["dependencies"] = { "jsoncpp" },
+	["files"] = { rv_serialize_src.."/**.cpp", rv_serialize_src.."/**.hpp" },
+	["include_dirs"] = { rv_serialize_src },
+	["defines"] = {},
+	["excludes"] = { "../src/examples/**", "../src/jsoncpp/**" },
+	["link_type"] = "dynamic",
+}
 
-	targetdir(EngineRootLocation.."/bin")
-	targetname "raven_serialize"
-	
-	configureWindowsSDK()
-
-	configuration "Debug"
-		defines { "DEBUG" }
-		symbols "on"
-		optimize "Off"
-		targetsuffix "_d"
-		objdir(_ACTION.."/obj/Debug")
-
-	configuration "Release"
-		optimize "Full"
-		objdir(_ACTION.."/obj/Release")
+registerModuleDef(module_definition)

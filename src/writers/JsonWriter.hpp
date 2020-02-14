@@ -20,7 +20,7 @@ class JsonWriter
 	: public IWriter
 {
 public:
-	explicit RAVEN_SER_API JsonWriter(std::ostream& stream, const bool prettyPrint = true);
+	explicit RAVEN_SERIALIZE_API JsonWriter(std::ostream& stream, const bool prettyPrint = true);
 
 	template <typename T>
 	void Write(const T& value)
@@ -32,14 +32,14 @@ public:
 		DoWrite();
 	}
 
-	void RAVEN_SER_API WriteObject(const rttr::Type& type, const void* value) final;
-	void RAVEN_SER_API WriteArray(const rttr::Type& itemType, const void* arrayStartPtr, const std::size_t size) final;
-	void RAVEN_SER_API WriteCustomObject(CustomObjectWriterFunc* objectWritersPtr, const std::size_t writersCount) final;
+	void RAVEN_SERIALIZE_API WriteObject(const rttr::Type& type, const void* value) final;
+	void RAVEN_SERIALIZE_API WriteArray(const rttr::Type& itemType, const void* arrayStartPtr, const std::size_t size) final;
+	void RAVEN_SERIALIZE_API WriteCustomObject(CustomObjectWriterFunc* objectWritersPtr, const std::size_t writersCount) final;
 
-	void RAVEN_SER_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
+	void RAVEN_SERIALIZE_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
 private:
-	void RAVEN_SER_API DoWrite();
+	void RAVEN_SERIALIZE_API DoWrite();
 	void GenerateSerializationContextValues();
 	std::string WStringToUtf8(const wchar_t* _literal);
 	void CreateSerializationContext();

@@ -23,7 +23,7 @@ class JsonReader
 	: public IReader
 {
 public:
-	explicit RAVEN_SER_API JsonReader(std::istream& stream);
+	explicit RAVEN_SERIALIZE_API JsonReader(std::istream& stream);
 
 	template <typename T>
 	void Read(T& value)
@@ -31,13 +31,13 @@ public:
 		Read(rttr::Reflect<T>(), &value);
 	}
 
-	void RAVEN_SER_API Read(const rttr::Type& type, void* value) final;
-	bool RAVEN_SER_API IsOk() const final;
+	void RAVEN_SERIALIZE_API Read(const rttr::Type& type, void* value) final;
+	bool RAVEN_SERIALIZE_API IsOk() const final;
 
-	void RAVEN_SER_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
+	void RAVEN_SERIALIZE_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
 private:
-	void RAVEN_SER_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
+	void RAVEN_SERIALIZE_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	rttr::Type DeduceType(const Json::Value& jsonVal) const;
 	std::string GetObjectClassName(const Json::Value& jsonVal) const;
 	void SortActions();

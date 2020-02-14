@@ -1,7 +1,6 @@
 #pragma once
 #include "helper/TypeTraitsExtension.hpp"
 #include "rttr/Constructor.hpp"
-#include "raven_serialize.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -110,56 +109,56 @@ struct type_data
 	SmartPtrValueResolver smartPtrValueResolver;
 	DebugValueViewer debugValueViewer = nullptr;
 
-	RAVEN_SER_API type_data(const TypeClass typeClass, const char* name
+	RAVEN_SERIALIZE_API type_data(const TypeClass typeClass, const char* name
 		, const std::size_t id, const std::size_t size, const std::type_index& typeIndex) noexcept;
 
 	type_data(const type_data&) = delete;
 	type_data& operator=(const type_data&) = delete;
-	RAVEN_SER_API type_data(type_data&&);
+	RAVEN_SERIALIZE_API type_data(type_data&&);
 };
 
 class Type
 {
 public:
-	RAVEN_SER_API Type();
-	RAVEN_SER_API Type(type_data* typeData);
+	RAVEN_SERIALIZE_API Type();
+	RAVEN_SERIALIZE_API Type(type_data* typeData);
 
-	RAVEN_SER_API const char* GetName() const;
-	const std::size_t RAVEN_SER_API GetId() const;
-	const std::size_t RAVEN_SER_API GetSize() const;
-	const bool RAVEN_SER_API IsValid() const;
-	const bool RAVEN_SER_API IsIntegral() const;
-	const bool RAVEN_SER_API IsFloatingPoint() const;
-	const bool RAVEN_SER_API IsArray() const;
-	const bool RAVEN_SER_API IsEnum() const;
-	const bool RAVEN_SER_API IsClass() const;
-	const bool RAVEN_SER_API IsFunction() const;
-	const bool RAVEN_SER_API IsPointer() const;
-	const bool RAVEN_SER_API IsSmartPointer() const;
-	const bool RAVEN_SER_API IsMemberObjectPointer() const;
-	const bool RAVEN_SER_API IsMemberFunctionPointer() const;
-	const bool RAVEN_SER_API IsConst() const;
-	const bool RAVEN_SER_API IsString() const;
-	const bool RAVEN_SER_API IsSigned() const;
+	RAVEN_SERIALIZE_API const char* GetName() const;
+	const std::size_t RAVEN_SERIALIZE_API GetId() const;
+	const std::size_t RAVEN_SERIALIZE_API GetSize() const;
+	const bool RAVEN_SERIALIZE_API IsValid() const;
+	const bool RAVEN_SERIALIZE_API IsIntegral() const;
+	const bool RAVEN_SERIALIZE_API IsFloatingPoint() const;
+	const bool RAVEN_SERIALIZE_API IsArray() const;
+	const bool RAVEN_SERIALIZE_API IsEnum() const;
+	const bool RAVEN_SERIALIZE_API IsClass() const;
+	const bool RAVEN_SERIALIZE_API IsFunction() const;
+	const bool RAVEN_SERIALIZE_API IsPointer() const;
+	const bool RAVEN_SERIALIZE_API IsSmartPointer() const;
+	const bool RAVEN_SERIALIZE_API IsMemberObjectPointer() const;
+	const bool RAVEN_SERIALIZE_API IsMemberFunctionPointer() const;
+	const bool RAVEN_SERIALIZE_API IsConst() const;
+	const bool RAVEN_SERIALIZE_API IsString() const;
+	const bool RAVEN_SERIALIZE_API IsSigned() const;
 
 	// Get type of the array, enum underlying value
-	RAVEN_SER_API const Type& GetUnderlyingType(const std::size_t index = 0U) const;
-	const std::size_t RAVEN_SER_API GetArrayRank() const;
-	const std::size_t RAVEN_SER_API GetArrayExtent(const std::size_t dimension = 0U) const;
-	RAVEN_SER_API Property* GetProperty(const std::size_t propertyIdx) const;
-	RAVEN_SER_API Property* FindProperty(const std::string& name) const;
-	std::size_t RAVEN_SER_API GetPropertiesCount() const;
-	RAVEN_SER_API const std::type_index& GetTypeIndex() const;
+	RAVEN_SERIALIZE_API const Type& GetUnderlyingType(const std::size_t index = 0U) const;
+	const std::size_t RAVEN_SERIALIZE_API GetArrayRank() const;
+	const std::size_t RAVEN_SERIALIZE_API GetArrayExtent(const std::size_t dimension = 0U) const;
+	RAVEN_SERIALIZE_API Property* GetProperty(const std::size_t propertyIdx) const;
+	RAVEN_SERIALIZE_API Property* FindProperty(const std::string& name) const;
+	std::size_t RAVEN_SERIALIZE_API GetPropertiesCount() const;
+	RAVEN_SERIALIZE_API const std::type_index& GetTypeIndex() const;
 
 	using ArrayIteratorFunc = std::function<void(const Type&, std::size_t, const void*)>;
-	void RAVEN_SER_API IterateArray(const void* value, const ArrayIteratorFunc& f) const;
-	std::size_t RAVEN_SER_API GetDynamicArraySize(const void* value) const;
-	bool RAVEN_SER_API IsDynamicArray() const;
-	void RAVEN_SER_API SetDynamicArraySize(void* value, const std::size_t count) const;
-	RAVEN_SER_API void* GetArrayItemValuePtr(void* value, const std::size_t idx) const;
+	void RAVEN_SERIALIZE_API IterateArray(const void* value, const ArrayIteratorFunc& f) const;
+	std::size_t RAVEN_SERIALIZE_API GetDynamicArraySize(const void* value) const;
+	bool RAVEN_SERIALIZE_API IsDynamicArray() const;
+	void RAVEN_SERIALIZE_API SetDynamicArraySize(void* value, const std::size_t count) const;
+	RAVEN_SERIALIZE_API void* GetArrayItemValuePtr(void* value, const std::size_t idx) const;
 
-	RAVEN_SER_API void* Instantiate() const;
-	void RAVEN_SER_API Destroy(void* object) const;
+	RAVEN_SERIALIZE_API void* Instantiate() const;
+	void RAVEN_SERIALIZE_API Destroy(void* object) const;
 
 	// =================================================================================================
 	// Constructors implementation
@@ -206,15 +205,15 @@ public:
 
 	// =================================================================================================
 
-	RAVEN_SER_API Constructor* GetConstructorByArgTypes(const std::vector<Type>& argTypes) const;
+	RAVEN_SERIALIZE_API Constructor* GetConstructorByArgTypes(const std::vector<Type>& argTypes) const;
 
-	RAVEN_SER_API void* GetSmartPtrValue(void* value) const;
-	std::type_index RAVEN_SER_API GetPointerTypeIndex(void* value) const;
-	RAVEN_SER_API const char* GetSmartPtrTypeName() const;
-	void RAVEN_SER_API AssignPointerValue(void* pointer, void* value) const;
+	RAVEN_SERIALIZE_API void* GetSmartPtrValue(void* value) const;
+	std::type_index RAVEN_SERIALIZE_API GetPointerTypeIndex(void* value) const;
+	RAVEN_SERIALIZE_API const char* GetSmartPtrTypeName() const;
+	void RAVEN_SERIALIZE_API AssignPointerValue(void* pointer, void* value) const;
 
-	bool RAVEN_SER_API operator==(const Type& other) const;
-	bool RAVEN_SER_API operator!=(const Type& other) const;
+	bool RAVEN_SERIALIZE_API operator==(const Type& other) const;
+	bool RAVEN_SERIALIZE_API operator!=(const Type& other) const;
 
 	template <typename T, typename ...ConstructorArgs>
 	Type& DeclConstructor()
@@ -258,16 +257,16 @@ public:
 		return *this;
 	}
 
-	RAVEN_SER_API Type& DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy);
+	RAVEN_SERIALIZE_API Type& DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy);
 
-	uint64_t RAVEN_SER_API CastToUnsignedInteger(const void* value) const;
-	int64_t RAVEN_SER_API CastToSignedInteger(const void* value) const;
-	double RAVEN_SER_API CastToFloat(const void* value) const;
+	uint64_t RAVEN_SERIALIZE_API CastToUnsignedInteger(const void* value) const;
+	int64_t RAVEN_SERIALIZE_API CastToSignedInteger(const void* value) const;
+	double RAVEN_SERIALIZE_API CastToFloat(const void* value) const;
 
-	RAVEN_SER_API const void* DebugViewValue(const void* value) const;
+	RAVEN_SERIALIZE_API const void* DebugViewValue(const void* value) const;
 
 private:
-	void RAVEN_SER_API AddProperty(std::shared_ptr<Property>&& property);
+	void RAVEN_SERIALIZE_API AddProperty(std::shared_ptr<Property>&& property);
 
 private:
 	type_data* m_typeData = nullptr;

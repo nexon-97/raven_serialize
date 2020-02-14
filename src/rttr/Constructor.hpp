@@ -1,5 +1,4 @@
 #pragma once
-#include "raven_serialize.hpp"
 #include <tuple>
 #include <memory>
 
@@ -13,13 +12,13 @@ class Type;
 class Constructor
 {
 public:
-	RAVEN_SER_API Constructor(Type* argTypes, int argsCount);
-	RAVEN_SER_API ~Constructor();
+	RAVEN_SERIALIZE_API Constructor(Type* argTypes, int argsCount);
+	RAVEN_SERIALIZE_API ~Constructor();
 
 	virtual void* Construct(void* paramsData) = 0;
 	virtual std::shared_ptr<void> ConstructShared(void* paramsData) = 0;
 
-	bool RAVEN_SER_API operator==(const Constructor& other) const;
+	bool RAVEN_SERIALIZE_API operator==(const Constructor& other) const;
 
 protected:
 	friend class Type;
