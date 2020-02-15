@@ -4,6 +4,7 @@ local rv_serialize_src = rv_serialize_path.."/src"
 local module_definition =
 {
 	["name"] = "raven_serialize",
+	["kind"] = "shared_lib",
 	["prj_location"] = rv_serialize_path.."/prj/".._ACTION,
 	["dependencies"] = { "jsoncpp" },
 	["files"] = { rv_serialize_src.."/**.cpp", rv_serialize_src.."/**.hpp" },
