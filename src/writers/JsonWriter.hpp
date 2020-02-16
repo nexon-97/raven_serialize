@@ -21,14 +21,13 @@ class JsonWriter
 {
 public:
 	explicit RAVEN_SERIALIZE_API JsonWriter(std::ostream& stream, const bool prettyPrint = true);
+	RAVEN_SERIALIZE_API ~JsonWriter() = default;
 
 	template <typename T>
 	void Write(const T& value)
 	{
 		WriteObject(rttr::Reflect<T>(), &value);
-		m_jsonRoot = std::move(*m_jsonStack.top());
-		m_jsonStack.pop();
-
+		PreWrite();
 		DoWrite();
 	}
 
@@ -39,6 +38,7 @@ public:
 	void RAVEN_SERIALIZE_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
 private:
+	void RAVEN_SERIALIZE_API PreWrite();
 	void RAVEN_SERIALIZE_API DoWrite();
 	void GenerateSerializationContextValues();
 	std::string WStringToUtf8(const wchar_t* _literal);

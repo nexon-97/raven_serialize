@@ -24,6 +24,7 @@ class JsonReader
 {
 public:
 	explicit RAVEN_SERIALIZE_API JsonReader(std::istream& stream);
+	RAVEN_SERIALIZE_API ~JsonReader() = default;
 
 	template <typename T>
 	void Read(T& value)

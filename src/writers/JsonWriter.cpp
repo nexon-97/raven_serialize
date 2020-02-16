@@ -279,6 +279,12 @@ void JsonWriter::CreateSerializationContext()
 	}
 }
 
+void JsonWriter::PreWrite()
+{
+	m_jsonRoot = std::move(*m_jsonStack.top());
+	m_jsonStack.pop();
+}
+
 void JsonWriter::DoWrite()
 {
 	Json::Value& serializedValue = m_jsonRoot;
