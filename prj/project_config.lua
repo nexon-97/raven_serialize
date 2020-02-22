@@ -10,7 +10,7 @@ local module_definition =
 	["files"] = { rv_serialize_src.."/**.cpp", rv_serialize_src.."/**.hpp" },
 	["include_dirs"] = { rv_serialize_src },
 	["defines"] = {},
-	["excludes"] = { "../src/examples/**", "../src/jsoncpp/**" },
+	["excludes"] = { rv_serialize_src.."/examples/**", rv_serialize_src.."/jsoncpp/**" },
 	["link_type"] = "dynamic",
 }
 

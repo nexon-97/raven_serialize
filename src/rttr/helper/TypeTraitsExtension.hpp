@@ -11,18 +11,6 @@ namespace rttr
 {
 
 template <typename>
-struct is_string : std::false_type {};
-
-template <>
-struct is_string<std::string> : std::true_type {};
-
-template <>
-struct is_string<std::wstring> : std::true_type {};
-
-template <>
-struct is_string<const char*> : std::true_type {};
-
-template <typename>
 struct is_std_vector : std::false_type {};
 
 template <typename T, typename A>

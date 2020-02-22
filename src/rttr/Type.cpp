@@ -147,6 +147,40 @@ void Type::AddProperty(std::unique_ptr<Property>&& property)
 	properties.emplace_back(std::move(property));
 }
 
+bool Type::IsCollection() const
+{
+	assert(m_typeData->typeClass == TypeClass::Object);
+	return !!m_typeData->typeParams.object->collectionParams;
+}
+
+std::unique_ptr<CollectionInserterBase> Type::CreateCollectionInserter(void* collection) const
+{
+	assert(m_typeData->typeClass == TypeClass::Object);
+
+	if (m_typeData->typeParams.object->collectionParams)
+	{
+		CollectionInserterFactory* inserterFactory = m_typeData->typeParams.object->collectionParams->inserterFactory.get();
+		if (inserterFactory)
+		{
+			return inserterFactory->CreateInserter(collection);
+		}
+	}
+
+	return std::unique_ptr<CollectionInserterBase>();
+}
+
+Type Type::GetCollectionItemType() const
+{
+	assert(m_typeData->typeClass == TypeClass::Object);
+
+	if (m_typeData->typeParams.object->collectionParams)
+	{
+		return m_typeData->typeParams.object->collectionParams->itemType;
+	}
+
+	return Type();
+}
+
 uint64_t Type::CastToUnsignedInteger(const void* valuePtr) const
 {
 	assert(m_typeData->typeClass == TypeClass::Integral);

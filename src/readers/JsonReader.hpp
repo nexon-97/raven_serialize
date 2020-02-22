@@ -58,6 +58,7 @@ private:
 	std::vector<std::unique_ptr<detail::IReaderAction>> m_actions;
 	ContextPath m_contextPath;
 	bool m_isOk = false;
+	bool m_hackBackCopyCollectionItem = false;
 };
 
 } // namespace rs

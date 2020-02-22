@@ -20,6 +20,7 @@ const char* k_smartptrTypeKey = "@smartptr@";
 const char* k_sysTypeId = "$sys_type$";
 const char* k_smartptrPointedValueKey = "ptr_value";
 const char* k_ptrMarkerKey = "$marker_id$";
+const char* k_collectionItemsKey = "$items$";
 
 struct StringJsonTypeResolver
 	: rs::JsonReader::PredefinedJsonTypeResolver
@@ -247,7 +248,15 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 
 				auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
 					, type, value, serializedValueType, serializedValue, customTypeResolver);
-				m_actions.push_back(std::move(resolverAction));
+
+				if (m_hackBackCopyCollectionItem)
+				{
+					resolverAction->Perform();
+				}
+				else
+				{
+					m_actions.push_back(std::move(resolverAction));
+				}
 			}
 			else
 			{
@@ -255,6 +264,29 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 				{
 				case rttr::TypeClass::Object:
 				{
+					if (type.IsCollection() && jsonVal.isObject() && jsonVal.isMember(k_collectionItemsKey))
+					{
+						const Json::Value& itemsJsonVal = jsonVal[k_collectionItemsKey];
+						std::unique_ptr<rttr::CollectionInserterBase> inserter = type.CreateCollectionInserter(value);
+						rttr::Type collectionItemType = type.GetCollectionItemType();
+
+						if (inserter && collectionItemType.IsValid())
+						{
+							for (const Json::Value& jsonItem : itemsJsonVal)
+							{
+								void* collectionItem = collectionItemType.Instantiate();
+
+								m_hackBackCopyCollectionItem = true;
+								ReadImpl(collectionItemType, collectionItem, jsonItem);
+								m_hackBackCopyCollectionItem = false;
+
+								inserter->Insert(collectionItem);
+
+								collectionItemType.Destroy(collectionItem);
+							}
+						}
+					}
+
 					std::size_t propertiesCount = type.GetPropertiesCount();
 					for (std::size_t i = 0U; i < propertiesCount; ++i)
 					{
