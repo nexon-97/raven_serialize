@@ -6,7 +6,7 @@ namespace rttr
 class ProxyConstructorBase
 {
 public:
-	virtual void* CreateFromProxy(void* proxyObject) = 0;
+	virtual void CreateFromProxy(void* target, void* proxyObject) = 0;
 };
 
 template <typename T, typename U>
@@ -16,11 +16,11 @@ class ProxyConstructorImpl
 	using RawU = typename std::remove_reference_t<U>;
 
 public:
-	void* CreateFromProxy(void* proxyObject) override
+	void CreateFromProxy(void* target, void* proxyObject) override
 	{
 		RawU* typedProxy = static_cast<RawU*>(proxyObject);
-		T* object = new T(std::forward<RawU>(*typedProxy));
-		return object;
+		T* typedTarget = static_cast<T*>(target);
+		*typedTarget = T(std::forward<RawU>(*typedProxy));
 	}
 };
 

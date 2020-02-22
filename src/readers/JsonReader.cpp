@@ -148,82 +148,99 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 {
 	assert(m_isOk);
 
-	// Find custom type resolver for this type
-	auto customResolverIt = m_customTypeResolvers.find(type.GetTypeIndex());
-	if (customResolverIt != m_customTypeResolvers.end())
+	rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
+	if (nullptr != proxyTypeData)
 	{
-		rttr::CustomTypeResolver* customTypeResolver = customResolverIt->second;
+		// Create proxy object
+		void* proxyObject = proxyTypeData->proxyType.Instantiate();
 
-		// Serialized value type
-		rttr::Type serializedValueType = DeduceType(jsonVal);
-		void* serializedValue = nullptr;
+		// Read proxy object
+		ReadImpl(proxyTypeData->proxyType, proxyObject, jsonVal);
 
-		// Deserialize custom value from data source to pass to resolver
-		if (serializedValueType.GetTypeIndex() != typeid(nullptr_t))
+		// Create target object using proxy constructor
+		proxyTypeData->conversionConstructor->CreateFromProxy(value, proxyObject);
+
+		// Destroy temp proxy
+		proxyTypeData->proxyType.Destroy(proxyObject);
+	}
+	else
+	{
+		// Find custom type resolver for this type
+		auto customResolverIt = m_customTypeResolvers.find(type.GetTypeIndex());
+		if (customResolverIt != m_customTypeResolvers.end())
 		{
-			serializedValue = m_context->CreateTempVariable(serializedValueType);
-			ReadImpl(serializedValueType, serializedValue, jsonVal);
+			rttr::CustomTypeResolver* customTypeResolver = customResolverIt->second;
+
+			// Serialized value type
+			rttr::Type serializedValueType = DeduceType(jsonVal);
+			void* serializedValue = nullptr;
+
+			// Deserialize custom value from data source to pass to resolver
+			if (serializedValueType.GetTypeIndex() != typeid(nullptr_t))
+			{
+				serializedValue = m_context->CreateTempVariable(serializedValueType);
+				ReadImpl(serializedValueType, serializedValue, jsonVal);
+			}
+
+			auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
+				, type, value, serializedValueType, serializedValue, customTypeResolver);
+			m_actions.push_back(std::move(resolverAction));
 		}
-
-		auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
-			, type, value, serializedValueType, serializedValue, customTypeResolver);
-		m_actions.push_back(std::move(resolverAction));
-	}
-	else if (type.GetTypeIndex() == typeid(bool))
-	{
-		*static_cast<bool*>(value) = jsonVal.asBool();
-	}
-	else if (type.IsString())
-	{
-		if (jsonVal.isNull())
+		else if (type.GetTypeIndex() == typeid(bool))
 		{
-			if (type.GetTypeIndex() == typeid(std::string))
+			*static_cast<bool*>(value) = jsonVal.asBool();
+		}
+		else if (type.IsString())
+		{
+			if (jsonVal.isNull())
 			{
-				*static_cast<std::string*>(value) = std::string();
+				if (type.GetTypeIndex() == typeid(std::string))
+				{
+					*static_cast<std::string*>(value) = std::string();
+				}
+				else if (type.GetTypeIndex() == typeid(std::wstring))
+				{
+					*static_cast<std::wstring*>(value) = std::wstring();
+				}
+				else if (type.GetTypeIndex() == typeid(const char*))
+				{
+					char** strSerializedValue = reinterpret_cast<char**>(value);
+					*strSerializedValue = nullptr;
+				}
 			}
-			else if (type.GetTypeIndex() == typeid(std::wstring))
+			else if (jsonVal.isString())
 			{
-				*static_cast<std::wstring*>(value) = std::wstring();
-			}
-			else if (type.GetTypeIndex() == typeid(const char*))
-			{
-				char** strSerializedValue = reinterpret_cast<char**>(value);
-				*strSerializedValue = nullptr;
+				const char* strValue = jsonVal.asCString();
+
+				if (type.GetTypeIndex() == typeid(std::string))
+				{
+					*static_cast<std::string*>(value) = strValue;
+				}
+				else if (type.GetTypeIndex() == typeid(std::wstring))
+				{
+					//std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+					//*static_cast<std::wstring*>(value) = converter.from_bytes(strValue);
+				}
+				else if (type.GetTypeIndex() == typeid(const char*))
+				{
+					char** strSerializedValue = reinterpret_cast<char**>(value);
+					*strSerializedValue = const_cast<char*>(strValue);
+				}
 			}
 		}
-		else if (jsonVal.isString())
+		else if (type.IsEnum())
 		{
-			const char* strValue = jsonVal.asCString();
-
-			if (type.GetTypeIndex() == typeid(std::string))
-			{
-				*static_cast<std::string*>(value) = strValue;
-			}
-			else if (type.GetTypeIndex() == typeid(std::wstring))
-			{
-				//std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-				//*static_cast<std::wstring*>(value) = converter.from_bytes(strValue);
-			}
-			else if (type.GetTypeIndex() == typeid(const char*))
-			{
-				char** strSerializedValue = reinterpret_cast<char**>(value);
-				*strSerializedValue = const_cast<char*>(strValue);
-			}
+			const rttr::Type& enumUnderlyingType = type.GetUnderlyingType(0U);
+			ReadImpl(enumUnderlyingType, value, jsonVal);
 		}
-	}
-	else if (type.IsEnum())
-	{
-		const rttr::Type& enumUnderlyingType = type.GetUnderlyingType(0U);
-		ReadImpl(enumUnderlyingType, value, jsonVal);
-	}
-	else if (type.IsIntegral())
-	{
-		if (type.IsSigned())
+		else if (type.IsIntegral())
 		{
-			int64_t intValue = jsonVal.asInt64();
-
-			switch (type.GetSize())
+			if (type.IsSigned())
 			{
+				int64_t intValue = jsonVal.asInt64();
+
+				switch (type.GetSize())
+				{
 				case 1:
 					*static_cast<int8_t*>(value) = static_cast<int8_t>(intValue);
 					break;
@@ -237,14 +254,14 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 				default:
 					*static_cast<int64_t*>(value) = intValue;
 					break;
+				}
 			}
-		}
-		else
-		{
-			uint64_t intValue = jsonVal.asUInt64();
-
-			switch (type.GetSize())
+			else
 			{
+				uint64_t intValue = jsonVal.asUInt64();
+
+				switch (type.GetSize())
+				{
 				case 1:
 					*static_cast<uint8_t*>(value) = static_cast<uint8_t>(intValue);
 					break;
@@ -258,111 +275,112 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 				default:
 					*static_cast<uint64_t*>(value) = intValue;
 					break;
+				}
 			}
 		}
-	}
-	else if (type.IsFloatingPoint())
-	{
-		double floatValue = jsonVal.asDouble();
-
-		if (type.GetTypeIndex() == typeid(float))
+		else if (type.IsFloatingPoint())
 		{
-			*static_cast<float*>(value) = static_cast<float>(floatValue);
-		}
-		else
-		{
-			*static_cast<double*>(value) = floatValue;
-		}
-	}
-	else if (type.IsSmartPointer())
-	{
-		const Json::Value& smartPtrValue = jsonVal[k_smartptrPointedValueKey];
-		if (smartPtrValue.isObject())
-		{
-			std::size_t markerId = static_cast<std::size_t>(smartPtrValue[k_ptrMarkerKey].asUInt());
-			auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
-			m_actions.push_back(std::move(resolvePtrAction));
-		}
-	}
-	else if (type.IsArray())
-	{
-		// Resize dynamic array
-		if (type.IsDynamicArray())
-		{
-			std::size_t count = jsonVal.size();
-			type.SetDynamicArraySize(value, count);
-		}
+			double floatValue = jsonVal.asDouble();
 
-		rttr::Type itemType = type.GetUnderlyingType();
-
-		std::size_t i = 0U;
-		for (const Json::Value& jsonItem : jsonVal)
-		{
-			m_contextPath.PushArrayItemAction(i);
-
-			void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
-			
-			//
-			auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
-			auto itemAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(itemValuePtr));
-			auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-			Log::LogMessage("JsonReader [0x%llX] array item ptr: (array at 0x%llX, item at 0x%llX)", readerAsInt, valueAsInt, itemAsInt);
-
-			ReadImpl(itemType, itemValuePtr, jsonItem);
-			++i;
-
-			m_contextPath.PopAction();
-		}
-
-		// [DEBUG]
-		type.GetDynamicArraySize(value);
-	}
-	else if (type.IsClass())
-	{
-		std::size_t propertiesCount = type.GetPropertiesCount();
-		for (std::size_t i = 0U; i < propertiesCount; ++i)
-		{
-			rttr::Property* property = type.GetProperty(i);
-			const rttr::Type& propertyType = property->GetType();
-			const char* propertyName = property->GetName();
-
-			if (jsonVal.isMember(propertyName))
+			if (type.GetTypeIndex() == typeid(float))
 			{
-				const Json::Value& itemJsonVal = jsonVal[propertyName];
-
-				m_contextPath.PushObjectPropertyAction(propertyName);
-
-				// Decide to create temp variable or not
-				void* propertyValuePtr = nullptr;
-				if (property->NeedsTempVariable())
-				{
-					propertyValuePtr = m_context->CreateTempVariable(property->GetType());
-				}
-				else
-				{
-					propertyValuePtr = property->GetValueAddress(value);
-				}
-
-				ReadImpl(propertyType, propertyValuePtr, itemJsonVal);
-
-				auto callMutatorAction = std::make_unique<detail::CallObjectMutatorAction>(m_contextPath.GetSize(), property, value, propertyValuePtr);
-				m_actions.push_back(std::move(callMutatorAction));
-
-				m_contextPath.PopAction();
+				*static_cast<float*>(value) = static_cast<float>(floatValue);
 			}
 			else
 			{
-				// [TODO] Log property read error here
+				*static_cast<double*>(value) = floatValue;
 			}
 		}
-	}
-	else if (type.IsPointer())
-	{
-		if (jsonVal.isObject() && jsonVal.isMember(k_ptrMarkerKey))
+		else if (type.IsSmartPointer())
 		{
-			std::size_t markerId = static_cast<std::size_t>(jsonVal[k_ptrMarkerKey].asUInt());
-			auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
-			m_actions.push_back(std::move(resolvePtrAction));
+			const Json::Value& smartPtrValue = jsonVal[k_smartptrPointedValueKey];
+			if (smartPtrValue.isObject())
+			{
+				std::size_t markerId = static_cast<std::size_t>(smartPtrValue[k_ptrMarkerKey].asUInt());
+				auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
+				m_actions.push_back(std::move(resolvePtrAction));
+			}
+		}
+		else if (type.IsArray())
+		{
+			// Resize dynamic array
+			if (type.IsDynamicArray())
+			{
+				std::size_t count = jsonVal.size();
+				type.SetDynamicArraySize(value, count);
+			}
+
+			rttr::Type itemType = type.GetUnderlyingType();
+
+			std::size_t i = 0U;
+			for (const Json::Value& jsonItem : jsonVal)
+			{
+				m_contextPath.PushArrayItemAction(i);
+
+				void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
+
+				//
+				auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
+				auto itemAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(itemValuePtr));
+				auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
+				Log::LogMessage("JsonReader [0x%llX] array item ptr: (array at 0x%llX, item at 0x%llX)", readerAsInt, valueAsInt, itemAsInt);
+
+				ReadImpl(itemType, itemValuePtr, jsonItem);
+				++i;
+
+				m_contextPath.PopAction();
+			}
+
+			// [DEBUG]
+			type.GetDynamicArraySize(value);
+		}
+		else if (type.IsClass())
+		{
+			std::size_t propertiesCount = type.GetPropertiesCount();
+			for (std::size_t i = 0U; i < propertiesCount; ++i)
+			{
+				rttr::Property* property = type.GetProperty(i);
+				const rttr::Type& propertyType = property->GetType();
+				const char* propertyName = property->GetName();
+
+				if (jsonVal.isMember(propertyName))
+				{
+					const Json::Value& itemJsonVal = jsonVal[propertyName];
+
+					m_contextPath.PushObjectPropertyAction(propertyName);
+
+					// Decide to create temp variable or not
+					void* propertyValuePtr = nullptr;
+					if (property->NeedsTempVariable())
+					{
+						propertyValuePtr = m_context->CreateTempVariable(property->GetType());
+					}
+					else
+					{
+						propertyValuePtr = property->GetValueAddress(value);
+					}
+
+					ReadImpl(propertyType, propertyValuePtr, itemJsonVal);
+
+					auto callMutatorAction = std::make_unique<detail::CallObjectMutatorAction>(m_contextPath.GetSize(), property, value, propertyValuePtr);
+					m_actions.push_back(std::move(callMutatorAction));
+
+					m_contextPath.PopAction();
+				}
+				else
+				{
+					// [TODO] Log property read error here
+				}
+			}
+		}
+		else if (type.IsPointer())
+		{
+			if (jsonVal.isObject() && jsonVal.isMember(k_ptrMarkerKey))
+			{
+				std::size_t markerId = static_cast<std::size_t>(jsonVal[k_ptrMarkerKey].asUInt());
+				auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
+				m_actions.push_back(std::move(resolvePtrAction));
+			}
 		}
 	}
 }
