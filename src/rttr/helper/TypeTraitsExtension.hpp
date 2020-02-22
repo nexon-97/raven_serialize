@@ -362,4 +362,13 @@ struct ExtractClassType<MutatorMethodByValue<T, ValueType>>
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
+template <typename T>
+struct IsMemberFuncPrototype : std::false_type {};
+
+template <typename RetT, typename T, typename ...Args>
+struct IsMemberFuncPrototype<RetT(T::*)(Args...)> : std::true_type {};
+
+template <typename RetT, typename T, typename ...Args>
+struct IsMemberFuncPrototype<RetT(T::*)(Args...) const> : std::true_type {};
+
 }

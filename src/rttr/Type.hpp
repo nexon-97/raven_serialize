@@ -1,7 +1,7 @@
 #pragma once
 #include "helper/TypeTraitsExtension.hpp"
 #include "rttr/Constructor.hpp"
-#include "rttr/ProxyConstructor.hpp"
+#include "rttr/ProxyConverter.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -164,7 +164,7 @@ public:
 	RAVEN_SERIALIZE_API void* Instantiate() const;
 	void RAVEN_SERIALIZE_API Destroy(void* object) const;
 
-	void RAVEN_SERIALIZE_API RegisterProxy(const Type& proxyType, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor);
+	void RAVEN_SERIALIZE_API RegisterProxy(const Type& proxyType);
 	RAVEN_SERIALIZE_API TypeProxyData* GetProxyType() const;
 
 	std::size_t RAVEN_SERIALIZE_API GetHash() const;

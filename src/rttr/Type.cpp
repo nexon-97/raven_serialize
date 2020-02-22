@@ -404,9 +404,9 @@ TypeProxyData* Type::GetProxyType() const
 	return Manager::GetRTTRManager().GetProxyType(Type(m_typeData));
 }
 
-void Type::RegisterProxy(const Type& proxyType, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor)
+void Type::RegisterProxy(const Type& proxyType)
 {
-	Manager::GetRTTRManager().RegisterProxyType(Type(m_typeData), proxyType, std::move(proxyConstructor));
+	Manager::GetRTTRManager().RegisterProxyType(Type(m_typeData), proxyType);
 }
 
 std::size_t Type::GetHash() const

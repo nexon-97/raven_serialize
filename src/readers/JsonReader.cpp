@@ -151,17 +151,24 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 	rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
 	if (nullptr != proxyTypeData)
 	{
-		// Create proxy object
-		void* proxyObject = proxyTypeData->proxyType.Instantiate();
+		if (proxyTypeData->readConverter)
+		{
+			// Create proxy object
+			void* proxyObject = proxyTypeData->proxyType.Instantiate();
 
-		// Read proxy object
-		ReadImpl(proxyTypeData->proxyType, proxyObject, jsonVal);
+			// Read proxy object
+			ReadImpl(proxyTypeData->proxyType, proxyObject, jsonVal);
 
-		// Create target object using proxy constructor
-		proxyTypeData->conversionConstructor->CreateFromProxy(value, proxyObject);
+			// Create target object using proxy constructor
+			proxyTypeData->readConverter->Convert(value, proxyObject);
 
-		// Destroy temp proxy
-		proxyTypeData->proxyType.Destroy(proxyObject);
+			// Destroy temp proxy
+			proxyTypeData->proxyType.Destroy(proxyObject);
+		}
+		else
+		{
+			Log::LogMessage("Type has proxy type, but no read converter defined!");
+		}
 	}
 	else
 	{

@@ -1,6 +1,6 @@
 #pragma once
 #include "rttr/Type.hpp"
-#include "rttr/ProxyConstructor.hpp"
+#include "rttr/ProxyConverter.hpp"
 
 namespace rttr
 {
@@ -26,9 +26,52 @@ public:
 		assert(nullptr == m_generatedType.GetProxyType());
 
 		Type proxyType = Reflect<U>();
-		std::unique_ptr<ProxyConstructorBase> proxyConstructor = std::make_unique<ProxyConstructorImpl<T, U>>();
-		m_generatedType.RegisterProxy(proxyType, std::move(proxyConstructor));
+		m_generatedType.RegisterProxy(proxyType);
 
+		return *this;
+	}
+
+	template <typename U>
+	TypeInitContext& SetDefaultProxyReadConverter()
+	{
+		TypeProxyData* proxyTypeData = m_generatedType.GetProxyType();
+		assert(nullptr != proxyTypeData);
+
+		proxyTypeData->readConverter = std::make_unique<ConstructorProxyConverter<T, U>>();
+		return *this;
+	}
+
+	template <typename ConverterT, typename ...Args>
+	TypeInitContext& SetProxyReadConverter(Args&&... args)
+	{
+		static_assert(std::is_base_of_v<ProxyConverterBase, ConverterT>, "Proxy converter must be derived from ProxyConverterBase!");
+
+		TypeProxyData* proxyTypeData = m_generatedType.GetProxyType();
+		assert(nullptr != proxyTypeData);
+
+		proxyTypeData->readConverter = std::make_unique<ConverterT>(std::forward<Args>(args)...);
+		return *this;
+	}
+
+	template <typename U>
+	TypeInitContext& SetDefaultProxyWriteConverter()
+	{
+		TypeProxyData* proxyTypeData = m_generatedType.GetProxyType();
+		assert(nullptr != proxyTypeData);
+
+		proxyTypeData->writeConverter = std::make_unique<ConstructorProxyConverter<U, T>>();
+		return *this;
+	}
+
+	template <typename ConverterT, typename MemberFuncPrototype>
+	TypeInitContext& SetProxyWriteConverter(MemberFuncPrototype memFnPrototype)
+	{
+		static_assert(std::is_base_of_v<ProxyConverterBase, ConverterT>, "Proxy converter must be derived from ProxyConverterBase!");
+
+		TypeProxyData* proxyTypeData = m_generatedType.GetProxyType();
+		assert(nullptr != proxyTypeData);
+
+		proxyTypeData->writeConverter = std::make_unique<ConverterT>(memFnPrototype);
 		return *this;
 	}
 

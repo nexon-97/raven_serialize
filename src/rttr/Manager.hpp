@@ -416,7 +416,7 @@ public:
 	Type RAVEN_SERIALIZE_API GetMetaTypeByName(const char* name);
 	Type RAVEN_SERIALIZE_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
 
-	void RAVEN_SERIALIZE_API RegisterProxyType(const Type& type, const Type& proxy, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor);
+	void RAVEN_SERIALIZE_API RegisterProxyType(const Type& type, const Type& proxyType);
 	RAVEN_SERIALIZE_API TypeProxyData* GetProxyType(const Type& type);
 
 	static RAVEN_SERIALIZE_API Manager& GetRTTRManager();

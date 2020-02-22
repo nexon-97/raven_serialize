@@ -39,9 +39,9 @@ Type Manager::GetMetaTypeByTypeIndex(const std::type_index& typeIndex)
 	return Type(nullptr);
 }
 
-void Manager::RegisterProxyType(const Type& type, const Type& proxyType, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor)
+void Manager::RegisterProxyType(const Type& type, const Type& proxyType)
 {
-	m_proxyTypes.emplace(std::piecewise_construct, std::forward_as_tuple(type), std::forward_as_tuple(proxyType, std::move(proxyConstructor)));
+	m_proxyTypes.emplace(type, proxyType);
 }
 
 TypeProxyData* Manager::GetProxyType(const Type& type)
