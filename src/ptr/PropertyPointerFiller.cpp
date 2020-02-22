@@ -23,11 +23,11 @@ void PropertyPointerFiller::Fill()
 	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
 	if (nullptr != objectData)
 	{
-		propertyType.AssignPointerValue(tempPointer, const_cast<void*>(objectData->objectPtr));
+		//propertyType.AssignPointerValue(tempPointer, const_cast<void*>(objectData->objectPtr));
 	}
 	else
 	{
-		propertyType.AssignPointerValue(tempPointer, nullptr);
+		//propertyType.AssignPointerValue(tempPointer, nullptr);
 	}
 
 	//auto propertyData = m_path.ResolvePropertyData();

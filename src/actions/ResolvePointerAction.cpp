@@ -26,12 +26,12 @@ void ResolvePointerAction::Perform()
 		auto pointerValueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(objectData->objectPtr));
 		Log::LogMessage("ResolvePointerAction performed. Pointer at 0x%llX filled with address 0x%llX", pointerAsInt, pointerValueAsInt);
 
-		m_pointerType.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
+		//m_pointerType.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
 	}
 	else
 	{
 		Log::LogMessage("ResolvePointerAction performed. Pointer at 0x%llX filled with address null", pointerAsInt);
-		m_pointerType.AssignPointerValue(m_pointerAddress, nullptr);
+		//m_pointerType.AssignPointerValue(m_pointerAddress, nullptr);
 	}
 }
 

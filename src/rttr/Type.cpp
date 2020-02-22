@@ -1,6 +1,11 @@
 #include "rttr/Type.hpp"
 #include "rttr/Property.hpp"
 #include "rttr/Manager.hpp"
+#include "rttr/details/ObjectClassParams.hpp"
+#include "rttr/details/PointerParams.hpp"
+#include "rttr/details/ArrayParams.hpp"
+#include "rttr/details/ScalarParams.hpp"
+#include "rttr/details/EnumParams.hpp"
 #include "rs/ICustomPropertyResolvePolicy.hpp"
 
 namespace rttr
@@ -12,7 +17,6 @@ type_data::type_data(const TypeClass typeClass, const char* name
 	, id(id)
 	, size(size)
 	, typeIndex(typeIndex)
-	, underlyingType{ nullptr }
 	, isUserDefined(false)
 	, typeClass(typeClass)
 {}
@@ -23,35 +27,12 @@ type_data::type_data(type_data&& other)
 	, id(other.id)
 	, size(other.size)
 	, typeIndex(other.typeIndex)
-	, isIntegral(other.isIntegral)
-	, isFloat(other.isFloat)
-	, isArray(other.isArray)
-	, isEnum(other.isEnum)
-	, isClass(other.isClass)
-	, isFunction(other.isFunction)
-	, isPointer(other.isPointer)
-	, isSmartPointer(other.isSmartPointer)
-	, isMemberObjPointer(other.isMemberObjPointer)
-	, isMemberFuncPointer(other.isMemberFuncPointer)
 	, isConst(other.isConst)
-	, isSigned(other.isSigned)
-	, isString(other.isString)
 	, isUserDefined(other.isUserDefined)
-	, arrayRank(other.arrayRank)
-	, arrayTraits(other.arrayTraits)
-	, smartptrParams(other.smartptrParams)
-	, dynamicArrayParams(other.dynamicArrayParams)
-	, arrayExtents(std::move(other.arrayExtents))
-	, properties(std::move(other.properties))
-	, constructors(std::move(other.constructors))
 	, instanceAllocator(other.instanceAllocator)
 	, instanceDestructor(other.instanceDestructor)
-	, pointerTypeIndexResolverFunc(other.pointerTypeIndexResolverFunc)
-	, smartPtrValueResolver(other.smartPtrValueResolver)
 	, debugValueViewer(other.debugValueViewer)
-{
-	std::memcpy(underlyingType, other.underlyingType, sizeof(Type*) * 2);
-}
+{}
 
 Type::Type()
 	: m_typeData(nullptr)
@@ -81,54 +62,9 @@ const std::size_t Type::GetSize() const
 	return m_typeData->size;
 }
 
-const bool Type::IsIntegral() const
+TypeClass Type::GetTypeClass() const
 {
-	return m_typeData->isIntegral;
-}
-
-const bool Type::IsFloatingPoint() const
-{
-	return m_typeData->isFloat;
-}
-
-const bool Type::IsArray() const
-{
-	return m_typeData->isArray;
-}
-
-const bool Type::IsEnum() const
-{
-	return m_typeData->isEnum;
-}
-
-const bool Type::IsClass() const
-{
-	return m_typeData->isClass;
-}
-
-const bool Type::IsFunction() const
-{
-	return m_typeData->isFunction;
-}
-
-const bool Type::IsPointer() const
-{
-	return m_typeData->isPointer;
-}
-
-const bool Type::IsSmartPointer() const
-{
-	return m_typeData->isSmartPointer;
-}
-
-const bool Type::IsMemberObjectPointer() const
-{
-	return m_typeData->isMemberObjPointer;
-}
-
-const bool Type::IsMemberFunctionPointer() const
-{
-	return m_typeData->isMemberFuncPointer;
+	return m_typeData->typeClass;
 }
 
 const bool Type::IsConst() const
@@ -136,37 +72,41 @@ const bool Type::IsConst() const
 	return m_typeData->isConst;
 }
 
-const bool Type::IsSigned() const
-{
-	return m_typeData->isSigned;
-}
-
-const bool Type::IsString() const
-{
-	return m_typeData->isString;
-}
-
 const std::size_t Type::GetArrayRank() const
 {
-	return m_typeData->arrayRank;
+	assert(m_typeData->typeClass == TypeClass::Array);
+	return m_typeData->typeParams.array_->arrayRank;
 }
 
 const std::size_t Type::GetArrayExtent(const std::size_t dimension) const
 {
-	return m_typeData->arrayExtents.get()[dimension];
+	assert(m_typeData->typeClass == TypeClass::Array);
+	return m_typeData->typeParams.array_->arrayExtents[dimension];
+}
+
+Type Type::GetEnumUnderlyingType() const
+{
+	assert(m_typeData->typeClass == TypeClass::Enum);
+	return m_typeData->typeParams.enum_->underlyingType;
+}
+
+Type Type::GetPointedType() const
+{
+	assert(m_typeData->typeClass == TypeClass::Pointer);
+	return m_typeData->typeParams.pointer->pointedType;
 }
 
 Property* Type::GetProperty(const std::size_t propertyIdx) const
 {
-	assert(IsClass());
-	return m_typeData->properties[propertyIdx].get();
+	assert(m_typeData->typeClass == TypeClass::Object);
+	return m_typeData->typeParams.object->properties[propertyIdx].get();
 }
 
 Property* Type::FindProperty(const std::string& name) const
 {
-	assert(IsClass());
+	assert(m_typeData->typeClass == TypeClass::Object);
 
-	for (auto& property : m_typeData->properties)
+	for (const auto& property : m_typeData->typeParams.object->properties)
 	{
 		if (property->GetName() == name)
 		{
@@ -179,8 +119,8 @@ Property* Type::FindProperty(const std::string& name) const
 
 std::size_t Type::GetPropertiesCount() const
 {
-	assert(IsClass());
-	return m_typeData->properties.size();
+	assert(m_typeData->typeClass == TypeClass::Object);
+	return m_typeData->typeParams.object->properties.size();
 }
 
 const std::type_index& Type::GetTypeIndex() const
@@ -188,27 +128,28 @@ const std::type_index& Type::GetTypeIndex() const
 	return m_typeData->typeIndex;
 }
 
-bool Type::IsDynamicArray() const
+void Type::AddProperty(std::unique_ptr<Property>&& property)
 {
-	return IsArray() && !m_typeData->arrayTraits.isSimpleArray;
-}
+	assert(m_typeData->typeClass == TypeClass::Object);
 
-void Type::AddProperty(std::shared_ptr<Property>&& property)
-{
-	auto predicate = [&property](const std::shared_ptr<Property>& item)
+	if (!property)
+		return;
+
+	auto predicate = [&property](const std::unique_ptr<Property>& item)
 	{
 		return item->GetName() == property->GetName();
 	};
 
-	auto it = std::find_if(m_typeData->properties.begin(), m_typeData->properties.end(), predicate);
-	assert(it == m_typeData->properties.end());
+	auto& properties = m_typeData->typeParams.object->properties;
+	auto it = std::find_if(properties.begin(), properties.end(), predicate);
+	assert(it == properties.end());
 
-	m_typeData->properties.emplace_back(std::move(property));
+	properties.emplace_back(std::move(property));
 }
 
 uint64_t Type::CastToUnsignedInteger(const void* valuePtr) const
 {
-	assert(IsIntegral());
+	assert(m_typeData->typeClass == TypeClass::Integral);
 
 	switch (m_typeData->size)
 	{
@@ -226,7 +167,7 @@ uint64_t Type::CastToUnsignedInteger(const void* valuePtr) const
 
 int64_t Type::CastToSignedInteger(const void* valuePtr) const
 {
-	assert(IsIntegral());
+	assert(m_typeData->typeClass == TypeClass::Integral);
 
 	switch (m_typeData->size)
 	{
@@ -244,7 +185,7 @@ int64_t Type::CastToSignedInteger(const void* valuePtr) const
 
 double Type::CastToFloat(const void* valuePtr) const
 {
-	assert(IsFloatingPoint());
+	assert(m_typeData->typeClass == TypeClass::Real);
 	double value = 0.0;
 
 	if (m_typeData->typeIndex == typeid(float))
@@ -259,59 +200,60 @@ double Type::CastToFloat(const void* valuePtr) const
 	return value;
 }
 
-void Type::IterateArray(const void* value, const ArrayIteratorFunc& f) const
+bool Type::IsSignedIntegral() const
 {
-	assert(IsArray());
-
-	if (m_typeData->arrayTraits.isStdArray)
-	{
-		std::size_t size = GetDynamicArraySize(value);
-
-		auto vectorPtr = reinterpret_cast<const std::vector<int>*>(value);
-		uintptr_t dataPtr = reinterpret_cast<uintptr_t>(vectorPtr->data());
-		auto underlyingType = GetUnderlyingType();
-		const std::size_t itemTypeSize = underlyingType.GetSize();
-
-		for (std::size_t i = 0U; i < size; ++i)
-		{
-			f(underlyingType, i, reinterpret_cast<void*>(dataPtr));
-			dataPtr += itemTypeSize;
-		}
-	}
-	else if (m_typeData->arrayTraits.isSimpleArray)
-	{
-		auto dataPtr = static_cast<const uint8_t*>(value);
-		auto underlyingType = GetUnderlyingType();
-
-		for (std::size_t i = 0U; i < m_typeData->arrayExtents.get()[0]; ++i)
-		{
-			f(underlyingType, i, dataPtr + underlyingType.GetSize() * i);
-		}
-	}
+	assert(m_typeData->typeClass == TypeClass::Integral);
+	return m_typeData->typeParams.scalar->isSigned;
 }
 
-const Type& Type::GetUnderlyingType(const std::size_t index) const
-{
-	return *m_typeData->underlyingType[index];
-}
+//void Type::IterateArray(const void* value, const ArrayIteratorFunc& f) const
+//{
+//	//assert(IsArray());
+//
+//	if (m_typeData->arrayTraits.isStdArray)
+//	{
+//		std::size_t size = GetDynamicArraySize(value);
+//
+//		auto vectorPtr = reinterpret_cast<const std::vector<int>*>(value);
+//		uintptr_t dataPtr = reinterpret_cast<uintptr_t>(vectorPtr->data());
+//		auto underlyingType = GetUnderlyingType();
+//		const std::size_t itemTypeSize = underlyingType.GetSize();
+//
+//		for (std::size_t i = 0U; i < size; ++i)
+//		{
+//			f(underlyingType, i, reinterpret_cast<void*>(dataPtr));
+//			dataPtr += itemTypeSize;
+//		}
+//	}
+//	else if (m_typeData->arrayTraits.isSimpleArray)
+//	{
+//		auto dataPtr = static_cast<const uint8_t*>(value);
+//		auto underlyingType = GetUnderlyingType();
+//
+//		for (std::size_t i = 0U; i < m_typeData->arrayExtents.get()[0]; ++i)
+//		{
+//			f(underlyingType, i, dataPtr + underlyingType.GetSize() * i);
+//		}
+//	}
+//}
 
-std::size_t Type::GetDynamicArraySize(const void* value) const
-{
-	assert(IsArray());
-	return m_typeData->dynamicArrayParams->getSizeFunc(value);
-}
-
-void Type::SetDynamicArraySize(void* value, const std::size_t count) const
-{
-	assert(IsArray());
-	m_typeData->dynamicArrayParams->resizeFunc(value, count);
-}
-
-void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
-{
-	assert(IsArray());
-	return m_typeData->dynamicArrayParams->getItemFunc(value, idx);
-}
+//std::size_t Type::GetDynamicArraySize(const void* value) const
+//{
+//	//assert(IsArray());
+//	return m_typeData->dynamicArrayParams->getSizeFunc(value);
+//}
+//
+//void Type::SetDynamicArraySize(void* value, const std::size_t count) const
+//{
+//	//assert(IsArray());
+//	m_typeData->dynamicArrayParams->resizeFunc(value, count);
+//}
+//
+//void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
+//{
+//	//assert(IsArray());
+//	return m_typeData->dynamicArrayParams->getItemFunc(value, idx);
+//}
 
 void* Type::Instantiate() const
 {
@@ -323,37 +265,31 @@ void Type::Destroy(void* object) const
 	std::invoke(m_typeData->instanceDestructor, object);
 }
 
-void* Type::GetSmartPtrValue(void* value) const
-{
-	assert(IsSmartPointer());
+//void* Type::GetSmartPtrValue(void* value) const
+//{
+//	assert(IsSmartPointer());
+//
+//	if (m_typeData->smartPtrValueResolver)
+//	{
+//		return m_typeData->smartPtrValueResolver(value);
+//	}
+//	
+//	return nullptr;
+//}
 
-	if (m_typeData->smartPtrValueResolver)
-	{
-		return m_typeData->smartPtrValueResolver(value);
-	}
-	
-	return nullptr;
-}
-
-std::type_index Type::GetPointerTypeIndex(void* value) const
-{
-	assert(IsPointer());
-	return m_typeData->pointerTypeIndexResolverFunc(value);
-}
-
-const char* Type::GetSmartPtrTypeName() const
-{
-	assert(IsSmartPointer());
-	return m_typeData->smartptrParams->smartptrTypeName;
-}
-
-void Type::AssignPointerValue(void* pointer, void* value) const
-{
-	if (IsSmartPointer())
-	{
-		m_typeData->smartptrParams->valueAssignFunc(pointer, value);
-	}
-}
+//const char* Type::GetSmartPtrTypeName() const
+//{
+//	assert(IsSmartPointer());
+//	return m_typeData->smartptrParams->smartptrTypeName;
+//}
+//
+//void Type::AssignPointerValue(void* pointer, void* value) const
+//{
+//	if (IsSmartPointer())
+//	{
+//		m_typeData->smartptrParams->valueAssignFunc(pointer, value);
+//	}
+//}
 
 bool Type::operator==(const Type& other) const
 {
@@ -370,35 +306,6 @@ const void* Type::DebugViewValue(const void* value) const
 	return m_typeData->debugValueViewer(value);
 }
 
-Type& Type::DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
-{
-	std::shared_ptr<Property> property = std::make_shared<rttr::CustomProperty>(name, policy, policy->GetType());
-	AddProperty(std::move(property));
-
-	return *this;
-}
-
-Constructor* Type::GetConstructorByArgTypes(const std::vector<Type>& argTypes) const
-{
-	for (const std::unique_ptr<Constructor>& constructor : m_typeData->constructors)
-	{
-		if (argTypes.size() != constructor->m_argsCount)
-			continue;
-
-		for (int i = 0; i < constructor->m_argsCount; ++i)
-		{
-			if (constructor->m_argTypes[i] != argTypes[i])
-			{
-				continue;
-			}
-		}
-
-		return constructor.get();
-	}
-
-	return nullptr;
-}
-
 TypeProxyData* Type::GetProxyType() const
 {
 	return Manager::GetRTTRManager().GetProxyType(Type(m_typeData));
@@ -413,7 +320,7 @@ std::size_t Type::GetHash() const
 {
 	if (m_typeData)
 	{
-		return static_cast<std::size_t>(m_typeData->hash);
+		return m_typeData->id;
 	}
 
 	return 0U;

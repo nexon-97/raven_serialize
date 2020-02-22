@@ -371,4 +371,10 @@ struct IsMemberFuncPrototype<RetT(T::*)(Args...)> : std::true_type {};
 template <typename RetT, typename T, typename ...Args>
 struct IsMemberFuncPrototype<RetT(T::*)(Args...) const> : std::true_type {};
 
+template <typename T>
+struct IsClassMemberPointer : std::false_type {};
+
+template <typename ValueT, typename T>
+struct IsClassMemberPointer<ValueT T::*> : std::true_type {};
+
 }

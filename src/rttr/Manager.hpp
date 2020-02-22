@@ -2,6 +2,12 @@
 #include "rttr/TypeInitContext.hpp"
 #include "rttr/Property.hpp"
 #include "rttr/TypeProxyData.hpp"
+#include "rttr/details/PointerParams.hpp"
+#include "rttr/details/ArrayParams.hpp"
+#include "rttr/details/EnumParams.hpp"
+#include "rttr/details/ObjectClassParams.hpp"
+#include "rttr/details/ScalarParams.hpp"
+#include "rttr/details/EnumParams.hpp"
 #include "helper/TypeTraitsExtension.hpp"
 #include "rs/log/Log.hpp"
 
@@ -217,63 +223,28 @@ struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value>>
 	}
 };
 
-template <typename T, typename Cond = void>
-struct SmartPointerTraitsResolver
-{
-	SmartPointerTraitsResolver(type_data& metaTypeData) {}
-};
+//template <typename T, typename Cond = void>
+//struct SmartPointerTraitsResolver
+//{
+//	SmartPointerTraitsResolver(type_data& metaTypeData) {}
+//};
+//
+//template <typename T>
+//struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
+//{
+//	SmartPointerTraitsResolver(type_data& metaTypeData)
+//	{
+//		static SmartPtrParams smartptrParams;
+//		smartptrParams.smartptrTypeName = smart_ptr_type_name_resolver<T>()();
+//		smartptrParams.valueAssignFunc = AssignSmartptrValue<T>;
+//
+//		metaTypeData.underlyingType[0] = new Type(Reflect<typename smart_ptr_type<T>::type>());
+//		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
+//		metaTypeData.smartptrParams = &smartptrParams;
+//	}
+//};
 
-template <typename T>
-struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
-{
-	SmartPointerTraitsResolver(type_data& metaTypeData)
-	{
-		static SmartPtrParams smartptrParams;
-		smartptrParams.smartptrTypeName = smart_ptr_type_name_resolver<T>()();
-		smartptrParams.valueAssignFunc = AssignSmartptrValue<T>;
-
-		metaTypeData.underlyingType[0] = new Type(Reflect<typename smart_ptr_type<T>::type>());
-		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
-		metaTypeData.smartptrParams = &smartptrParams;
-	}
-};
-
-template <typename T, typename Cond = void>
-struct PointerTraitsResolver
-{
-	PointerTraitsResolver(type_data& metaTypeData) {}
-};
-
-template <typename T>
-struct PointerTraitsResolver<T, std::enable_if_t<std::is_pointer<T>::value>>
-{
-	PointerTraitsResolver(type_data& metaTypeData)
-	{
-		metaTypeData.underlyingType[0] = new Type(Reflect<typename std::pointer_traits<T>::element_type>());
-		metaTypeData.pointerTypeIndexResolverFunc = GetTypeIndexFromPointerType<T>;
-	}
-};
-
-template <typename T, typename Cond = void>
-struct EnumTraitsResolver
-{
-	EnumTraitsResolver(type_data& metaTypeData) {}
-};
-
-template <typename T>
-struct EnumTraitsResolver<T, std::enable_if_t<std::is_enum<T>::value>>
-{
-	EnumTraitsResolver(type_data& metaTypeData)
-	{
-		metaTypeData.underlyingType[0] = new Type(Reflect<typename std::underlying_type<T>::type>());
-	}
-};
-
-template <typename T, typename Cond = void>
-struct TypeClassResolver
-{
-	TypeClass operator()() { return TypeClass::Invalid; }
-};
+///////////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>
 const void* DebugValueViewerF(const void* value)
@@ -283,22 +254,22 @@ const void* DebugValueViewerF(const void* value)
 };
 
 template <typename Signature>
-std::shared_ptr<Property> CreateMemberProperty(const char* name, Signature signature)
+std::unique_ptr<Property> CreateMemberProperty(const char* name, Signature signature)
 {
 	using T = typename ExtractClassType<Signature>::type;
 	using ValueType = typename ExtractValueType<Signature>::type;
 
-	return std::make_shared<MemberProperty<T, ValueType, Signature>>(name, signature, Reflect<ValueType>());
+	return std::make_unique<MemberProperty<T, ValueType, Signature>>(name, signature, Reflect<ValueType>());
 }
 
 template <typename GetterSignature, typename SetterSignature>
-std::shared_ptr<Property> CreateIndirectProperty(const char* name, GetterSignature getter, SetterSignature setter)
+std::unique_ptr<Property> CreateIndirectProperty(const char* name, GetterSignature getter, SetterSignature setter)
 {
 	static_assert(std::is_same<typename ExtractValueType<GetterSignature>::type, typename ExtractValueType<SetterSignature>::type>::value, "Setter ang getter types mismatch!");
 	using ValueType = typename ExtractValueType<GetterSignature>::type;	
 	using T = typename ExtractClassType<GetterSignature>::type;
 
-	return std::make_shared<IndirectProperty<T, ValueType, GetterSignature, SetterSignature>>(name, getter, setter, Reflect<ValueType>());
+	return std::make_unique<IndirectProperty<T, ValueType, GetterSignature, SetterSignature>>(name, getter, setter, Reflect<ValueType>());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -376,38 +347,46 @@ public:
 	template <typename T>
 	void FillMetaTypeData(type_data& metaTypeData)
 	{
-		metaTypeData.isIntegral = std::is_integral<T>::value;
-		metaTypeData.isFloat = std::is_floating_point<T>::value;
-		metaTypeData.isArray = std::is_array<T>::value || is_std_vector<T>::value || is_std_array<T>::value;
-		metaTypeData.isEnum = std::is_enum<T>::value;
-		metaTypeData.isClass = std::is_class<T>::value;
-		metaTypeData.isFunction = std::is_function<T>::value;
-		metaTypeData.isPointer = std::is_pointer<T>::value;
-		metaTypeData.isSmartPointer = is_smart_ptr<T>::value;
-		metaTypeData.isMemberObjPointer = std::is_member_object_pointer<T>::value;
-		metaTypeData.isMemberFuncPointer = std::is_member_function_pointer<T>::value;
 		metaTypeData.isConst = std::is_const<T>::value;
-		metaTypeData.isSigned = std::is_signed<T>::value;
-		metaTypeData.isString = is_string<T>::value;
 
-		if (metaTypeData.isArray)
+		switch (metaTypeData.typeClass)
 		{
-			ArrayDataResolver<T> arrayDataResolver(metaTypeData);
-		}
-
-		if (metaTypeData.isPointer)
-		{
-			PointerTraitsResolver<T> pointerTraitsResolver(metaTypeData);
-		}
-
-		if (metaTypeData.isEnum)
-		{
-			EnumTraitsResolver<T> enumTraitsResolver(metaTypeData);
-		}
-
-		if (metaTypeData.isSmartPointer)
-		{
-			SmartPointerTraitsResolver<T> smartptrTraitsResolver(metaTypeData);
+		case TypeClass::Pointer:
+			{
+				PointerTraitsResolver<T> pointerTraitsResolver;
+				metaTypeData.typeParams.pointer = new PointerParams();
+				pointerTraitsResolver(*metaTypeData.typeParams.pointer);
+			}
+			break;
+		case TypeClass::Array:
+			{
+				metaTypeData.typeParams.array_ = new ArrayParams();
+			}
+			break;
+		case TypeClass::Integral:
+			{
+				ScalarTraitsResolver<T> scalarTraitsResolver;
+				metaTypeData.typeParams.scalar = new ScalarParams();
+				scalarTraitsResolver(*metaTypeData.typeParams.scalar);
+			}
+			break;
+		case TypeClass::Real:
+			{
+				metaTypeData.typeParams.scalar = new ScalarParams();
+			}
+			break;
+		case TypeClass::Object:
+			{
+				metaTypeData.typeParams.object = new ObjectClassParams();
+			}
+			break;
+		case TypeClass::Enum:
+			{
+				EnumTraitsResolver<T> enumTraitsResolver;
+				metaTypeData.typeParams.enum_ = new EnumParams();
+				enumTraitsResolver(*metaTypeData.typeParams.enum_);
+			}
+			break;
 		}
 
 		metaTypeData.debugValueViewer = &DebugValueViewerF<T>;
@@ -437,6 +416,12 @@ template <typename T>
 TypeInitContext<T> DeclType(const char* name)
 {
 	return Manager::GetRTTRManager().CreateTypeInitContext<T>(name, DefaultInstanceAllocator<T>());
+}
+
+template <typename T, typename Alloc>
+TypeInitContext<T> DeclType(const char* name, Alloc allocatorObject)
+{
+	return Manager::GetRTTRManager().CreateTypeInitContext<T>(name, allocatorObject);
 }
 
 template <typename T>

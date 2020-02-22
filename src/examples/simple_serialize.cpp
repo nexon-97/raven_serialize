@@ -1,6 +1,5 @@
 #include "rttr/Property.hpp"
 #include "rttr/Manager.hpp"
-#include "rttr/Constructor.hpp"
 
 #include <fstream>
 
@@ -92,24 +91,24 @@ int main()
 	value.somevec[0] = 25;
 	value.somevec[6] = -92;*/
 
-	rttr::MetaType<Vector3>("Vector3")
-		.DeclConstructor<Vector3>()
-		.DeclConstructor<Vector3, float>()
-		.DeclConstructor<Vector3, float, float, float>()
+	rttr::DeclType<Vector3>("Vector3")
+		//.DeclConstructor<Vector3>()
+		//.DeclConstructor<Vector3, float>()
+		//.DeclConstructor<Vector3, float, float, float>()
 		.DeclProperty("x", &Vector3::x)
 		.DeclProperty("y", &Vector3::y)
 		.DeclProperty("z", &Vector3::z)
 		;
 
-	rttr::MetaType<Quaternion>("Quaternion")
-		.DeclConstructor<Quaternion>()
-		.DeclConstructor<Quaternion, float, float, float, float>()
+	rttr::DeclType<Quaternion>("Quaternion")
+		//.DeclConstructor<Quaternion>()
+		//.DeclConstructor<Quaternion, float, float, float, float>()
 		.DeclProperty("x", &Quaternion::x)
 		.DeclProperty("y", &Quaternion::y)
 		.DeclProperty("z", &Quaternion::z)
 		.DeclProperty("w", &Quaternion::w);
 
-	rttr::MetaType<TestStruct>("TestStruct")
+	rttr::DeclType<TestStruct>("TestStruct")
 		.DeclProperty("a", &TestStruct::GetA, &TestStruct::SetA)
 		.DeclProperty("position", &TestStruct::position)
 		.DeclProperty("scale", &TestStruct::scale)
@@ -117,16 +116,6 @@ int main()
 		.DeclProperty("timestamp", &TestStruct::timestamp)
 		.DeclProperty("vec", &TestStruct::vec)
 		;
-
-	rttr::Type reflectedVec3Type = rttr::Reflect("Vector3");
-	rttr::Type reflectedQuatType = rttr::Reflect("Quaternion");
-	if (reflectedVec3Type.IsValid())
-	{
-		std::unique_ptr<Vector3> testVecInstance = reflectedVec3Type.CreateUniqueInstance<Vector3>(25.f, 10.f, -30.f);
-		Vector3* heapInstance = reflectedVec3Type.CreateHeapInstance<Vector3>(125.f, 120.f, -230.f);
-		std::shared_ptr<Quaternion> sharedQuat = reflectedQuatType.CreateSharedInstance<Quaternion>();
-		int a = 0;
-	}
 
 	return 0;
 }

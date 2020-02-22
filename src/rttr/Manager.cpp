@@ -57,13 +57,7 @@ TypeProxyData* Manager::GetProxyType(const Type& type)
 
 void Manager::AddTypeDataInternal(const std::type_index& typeIndex, std::unique_ptr<type_data>&& typeData)
 {
-	type_data* typeDataRaw = typeData.get();
 	m_types.emplace(typeIndex, std::move(typeData));
-
-	if (nullptr != typeDataRaw)
-	{
-		typeDataRaw->hash = m_types.size();
-	}
 }
 
 Type Reflect(const char* name)

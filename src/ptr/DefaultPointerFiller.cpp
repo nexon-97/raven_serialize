@@ -19,11 +19,11 @@ void DefaultPointerFiller::Fill()
 	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
 	if (nullptr != objectData)
 	{
-		m_type.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
+		//m_type.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
 	}
 	else
 	{
-		m_type.AssignPointerValue(m_pointerAddress, nullptr);
+		//m_type.AssignPointerValue(m_pointerAddress, nullptr);
 	}
 }
 

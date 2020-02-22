@@ -5,6 +5,15 @@
 namespace rttr
 {
 
+template <typename Signature>
+struct PropertyCreatorFromSignature
+{
+	std::unique_ptr<Property> operator()(const char* name, Signature memberPointerSignature)
+	{
+		return CreateMemberProperty(name, memberPointerSignature);
+	}
+};
+
 template <typename T>
 class TypeInitContext
 {
@@ -78,8 +87,11 @@ public:
 	template <typename Signature>
 	TypeInitContext& DeclProperty(const char* name, Signature signature)
 	{
-		std::shared_ptr<Property> property = CreateMemberProperty(name, signature);
-		m_generatedType.AddProperty(std::move(property));
+		static_assert(std::is_same_v<ExtractClassType<Signature>::type, T>, "Member signature class type doesn't match!");
+
+		PropertyCreatorFromSignature<Signature> propertyCreator;
+		std::unique_ptr<Property> propertyInstance = propertyCreator(name, signature);
+		m_generatedType.AddProperty(std::move(propertyInstance));
 
 		return *this;
 	}
@@ -87,8 +99,21 @@ public:
 	template <typename GetterSignature, typename SetterSignature>
 	TypeInitContext& DeclProperty(const char* name, GetterSignature getter, SetterSignature setter)
 	{
-		std::shared_ptr<Property> property = CreateIndirectProperty(name, getter, setter);
-		m_generatedType.AddProperty(std::move(property));
+		static_assert(IsMemberFuncPrototype<GetterSignature>::value, "GetterSignature must be member function prototype");
+		static_assert(IsMemberFuncPrototype<SetterSignature>::value, "SetterSignature must be member function prototype");
+		static_assert(std::is_same_v<ExtractClassType<GetterSignature>::type, T>, "Member function prototype doesn't match type!");
+		static_assert(std::is_same_v<ExtractClassType<SetterSignature>::type, T>, "Proxy converter must be derived from ProxyConverterBase!");
+
+		std::unique_ptr<Property> propertyInstance = CreateIndirectProperty(name, getter, setter);
+		m_generatedType.AddProperty(std::move(propertyInstance));
+
+		return *this;
+	}
+
+	Type& DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
+	{
+		std::unique_ptr<Property> propertyInstance = std::make_unique<rttr::CustomProperty>(name, policy, policy->GetType());
+		m_generatedType.AddProperty(std::move(propertyInstance));
 
 		return *this;
 	}

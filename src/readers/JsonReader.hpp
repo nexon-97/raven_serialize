@@ -37,6 +37,11 @@ public:
 
 	void RAVEN_SERIALIZE_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
 
+	struct PredefinedJsonTypeResolver
+	{
+		virtual void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) = 0;
+	};
+
 private:
 	void RAVEN_SERIALIZE_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	rttr::Type DeduceType(const Json::Value& jsonVal) const;
@@ -46,6 +51,7 @@ private:
 private:
 	std::istream& m_stream;
 	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
+	std::unordered_map<std::type_index, std::unique_ptr<PredefinedJsonTypeResolver>> m_predefinedJsonTypeResolvers;
 	Json::Value m_jsonRoot;
 	void* m_currentRootObject = nullptr;
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
