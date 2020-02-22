@@ -1,5 +1,6 @@
 #include "rttr/Type.hpp"
 #include "rttr/Property.hpp"
+#include "rttr/Manager.hpp"
 #include "rs/ICustomPropertyResolvePolicy.hpp"
 
 namespace rttr
@@ -396,6 +397,26 @@ Constructor* Type::GetConstructorByArgTypes(const std::vector<Type>& argTypes) c
 	}
 
 	return nullptr;
+}
+
+TypeProxyData* Type::GetProxyType() const
+{
+	return Manager::GetRTTRManager().GetProxyType(Type(m_typeData));
+}
+
+void Type::RegisterProxy(const Type& proxyType, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor)
+{
+	Manager::GetRTTRManager().RegisterProxyType(Type(m_typeData), proxyType, std::move(proxyConstructor));
+}
+
+std::size_t Type::GetHash() const
+{
+	if (m_typeData)
+	{
+		return static_cast<std::size_t>(m_typeData->hash);
+	}
+
+	return 0U;
 }
 
 } // namespace rttr

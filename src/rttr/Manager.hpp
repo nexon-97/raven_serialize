@@ -1,6 +1,7 @@
 #pragma once
-#include "rttr/Type.hpp"
+#include "rttr/TypeInitContext.hpp"
 #include "rttr/Property.hpp"
+#include "rttr/TypeProxyData.hpp"
 #include "helper/TypeTraitsExtension.hpp"
 #include "rs/log/Log.hpp"
 
@@ -310,6 +311,13 @@ public:
 
 	void Init();
 
+	template <typename T, typename AllocatorT>
+	TypeInitContext<T> CreateTypeInitContext(const char* name, AllocatorT allocator)
+	{
+		Type type = RegisterMetaType<T>(name, allocator, true);
+		return TypeInitContext<T>(type);
+	}
+
 	template <typename T, typename AllocatorT = DefaultInstanceAllocator<T>>
 	Type RegisterMetaType(const char* name, AllocatorT allocator, const bool userDefined)
 	{
@@ -321,7 +329,7 @@ public:
 			const char* typeName = (nullptr != name) ? name : typeid(T).name();
 			std::unique_ptr<type_data> i_metaTypeData = std::make_unique<type_data>(TypeClassResolver<T>()(), typeName, m_nextId, sizeof(T), typeid(T));
 			type_data* typeDataRawPtr = i_metaTypeData.get();
-			m_types.emplace(typeid(T), std::move(i_metaTypeData));
+			AddTypeDataInternal(typeid(T), std::move(i_metaTypeData));
 			++m_nextId;
 
 			m_typeNames.emplace(typeName, typeDataRawPtr);
@@ -408,15 +416,28 @@ public:
 	Type RAVEN_SERIALIZE_API GetMetaTypeByName(const char* name);
 	Type RAVEN_SERIALIZE_API GetMetaTypeByTypeIndex(const std::type_index& typeIndex);
 
+	void RAVEN_SERIALIZE_API RegisterProxyType(const Type& type, const Type& proxy, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor);
+	RAVEN_SERIALIZE_API TypeProxyData* GetProxyType(const Type& type);
+
 	static RAVEN_SERIALIZE_API Manager& GetRTTRManager();
+
+private:
+	void RAVEN_SERIALIZE_API AddTypeDataInternal(const std::type_index& typeIndex, std::unique_ptr<type_data>&& typeData);
 
 private:
 	std::unordered_map<std::type_index, std::unique_ptr<type_data>> m_types;
 	std::unordered_map<std::string, type_data*> m_typeNames;
+	std::unordered_map<Type, TypeProxyData> m_proxyTypes;
 	std::size_t m_nextId = 0U;
 };
 
 void RAVEN_SERIALIZE_API InitRavenSerialization();
+
+template <typename T>
+TypeInitContext<T> DeclType(const char* name)
+{
+	return Manager::GetRTTRManager().CreateTypeInitContext<T>(name, DefaultInstanceAllocator<T>());
+}
 
 template <typename T>
 Type MetaType(const char* name)

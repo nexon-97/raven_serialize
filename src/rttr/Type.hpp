@@ -1,6 +1,7 @@
 #pragma once
 #include "helper/TypeTraitsExtension.hpp"
 #include "rttr/Constructor.hpp"
+#include "rttr/ProxyConstructor.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -20,6 +21,7 @@ namespace rttr
 
 class Property;
 class Type;
+struct TypeProxyData;
 
 template <typename T>
 Type Reflect();
@@ -64,6 +66,7 @@ enum class TypeClass
 	Enum,
 	Function,
 	Pointer,
+	Object,
 	SmartPointer,
 };
 
@@ -107,6 +110,7 @@ struct type_data
 	MetaTypeInstanceDestructor instanceDestructor;
 	PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
 	SmartPtrValueResolver smartPtrValueResolver;
+	uint64_t hash = 0U;
 	DebugValueViewer debugValueViewer = nullptr;
 
 	RAVEN_SERIALIZE_API type_data(const TypeClass typeClass, const char* name
@@ -159,6 +163,11 @@ public:
 
 	RAVEN_SERIALIZE_API void* Instantiate() const;
 	void RAVEN_SERIALIZE_API Destroy(void* object) const;
+
+	void RAVEN_SERIALIZE_API RegisterProxy(const Type& proxyType, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor);
+	RAVEN_SERIALIZE_API TypeProxyData* GetProxyType() const;
+
+	std::size_t RAVEN_SERIALIZE_API GetHash() const;
 
 	// =================================================================================================
 	// Constructors implementation
@@ -282,3 +291,18 @@ std::vector<Type> ReflectArgTypes()
 }
 
 } // namespace rttr
+
+// Declare std::hash specialization
+namespace std
+{
+
+template <>
+struct hash<rttr::Type>
+{
+	std::size_t operator()(const rttr::Type& type) const
+	{
+		return type.GetHash();
+	}
+};
+
+}

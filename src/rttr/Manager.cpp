@@ -39,6 +39,33 @@ Type Manager::GetMetaTypeByTypeIndex(const std::type_index& typeIndex)
 	return Type(nullptr);
 }
 
+void Manager::RegisterProxyType(const Type& type, const Type& proxyType, std::unique_ptr<ProxyConstructorBase>&& proxyConstructor)
+{
+	m_proxyTypes.emplace(std::piecewise_construct, std::forward_as_tuple(type), std::forward_as_tuple(proxyType, std::move(proxyConstructor)));
+}
+
+TypeProxyData* Manager::GetProxyType(const Type& type)
+{
+	auto it = m_proxyTypes.find(type);
+	if (it != m_proxyTypes.end())
+	{
+		return &(it->second);
+	}
+
+	return nullptr;
+}
+
+void Manager::AddTypeDataInternal(const std::type_index& typeIndex, std::unique_ptr<type_data>&& typeData)
+{
+	type_data* typeDataRaw = typeData.get();
+	m_types.emplace(typeIndex, std::move(typeData));
+
+	if (nullptr != typeDataRaw)
+	{
+		typeDataRaw->hash = m_types.size();
+	}
+}
+
 Type Reflect(const char* name)
 {
 	return Manager::GetRTTRManager().GetMetaTypeByName(name);
