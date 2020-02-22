@@ -7,6 +7,7 @@
 #include "actions/CallObjectMutatorAction.hpp"
 #include "actions/ResolvePointerAction.hpp"
 #include "actions/CustomResolverAction.hpp"
+#include "actions/CollectionInsertAction.hpp"
 
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #include <codecvt>
@@ -203,16 +204,13 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 		if (proxyTypeData->readConverter)
 		{
 			// Create proxy object
-			void* proxyObject = proxyTypeData->proxyType.Instantiate();
+			void* proxyObject = m_context->CreateTempVariable(proxyTypeData->proxyType);
 
 			// Read proxy object
 			ReadImpl(proxyTypeData->proxyType, proxyObject, jsonVal);
 
 			// Create target object using proxy constructor
 			proxyTypeData->readConverter->Convert(value, proxyObject);
-
-			// Destroy temp proxy
-			proxyTypeData->proxyType.Destroy(proxyObject);
 		}
 		else
 		{
@@ -248,15 +246,7 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 
 				auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
 					, type, value, serializedValueType, serializedValue, customTypeResolver);
-
-				if (m_hackBackCopyCollectionItem)
-				{
-					resolverAction->Perform();
-				}
-				else
-				{
-					m_actions.push_back(std::move(resolverAction));
-				}
+				m_actions.push_back(std::move(resolverAction));
 			}
 			else
 			{
@@ -264,30 +254,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 				{
 				case rttr::TypeClass::Object:
 				{
-					if (type.IsCollection() && jsonVal.isObject() && jsonVal.isMember(k_collectionItemsKey))
-					{
-						const Json::Value& itemsJsonVal = jsonVal[k_collectionItemsKey];
-						std::unique_ptr<rttr::CollectionInserterBase> inserter = type.CreateCollectionInserter(value);
-						rttr::Type collectionItemType = type.GetCollectionItemType();
-
-						if (inserter && collectionItemType.IsValid())
-						{
-							for (const Json::Value& jsonItem : itemsJsonVal)
-							{
-								void* collectionItem = collectionItemType.Instantiate();
-
-								m_hackBackCopyCollectionItem = true;
-								ReadImpl(collectionItemType, collectionItem, jsonItem);
-								m_hackBackCopyCollectionItem = false;
-
-								inserter->Insert(collectionItem);
-
-								collectionItemType.Destroy(collectionItem);
-							}
-						}
-					}
-
 					std::size_t propertiesCount = type.GetPropertiesCount();
+
 					for (std::size_t i = 0U; i < propertiesCount; ++i)
 					{
 						rttr::Property* property = type.GetProperty(i);
@@ -321,6 +289,41 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 						else
 						{
 							// [TODO] Log property read error here
+						}
+					}
+
+					if (type.IsCollection())
+					{
+						Json::Value const* collectionItemsVal = nullptr;
+						std::unique_ptr<rttr::CollectionInserterBase> inserter = type.CreateCollectionInserter(value);
+						rttr::Type collectionItemType = type.GetCollectionItemType();
+
+						if (propertiesCount == 0 && jsonVal.isArray())
+						{
+							collectionItemsVal = &jsonVal;
+						}
+						else if (jsonVal.isObject() && jsonVal.isMember(k_collectionItemsKey))
+						{
+							collectionItemsVal = &jsonVal[k_collectionItemsKey];
+						}
+
+						if (collectionItemsVal && inserter && collectionItemType.IsValid())
+						{
+							rttr::CollectionInserterBase* rawInserter = inserter.get();
+							m_collectionInserters.push_back(std::move(inserter));
+
+							for (const Json::Value& jsonItem : *collectionItemsVal)
+							{
+								m_contextPath.PushObjectPropertyAction("CollectionItem");
+
+								void* collectionItem = m_context->CreateTempVariable(collectionItemType);
+								ReadImpl(collectionItemType, collectionItem, jsonItem);
+
+								auto insertAction = std::make_unique<detail::CollectionInsertAction>(m_contextPath.GetSize(), rawInserter, collectionItem);
+								m_actions.push_back(std::move(insertAction));
+
+								m_contextPath.PopAction();
+							}
 						}
 					}
 				}

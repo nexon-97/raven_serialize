@@ -56,9 +56,9 @@ private:
 	void* m_currentRootObject = nullptr;
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
 	std::vector<std::unique_ptr<detail::IReaderAction>> m_actions;
+	std::vector<std::unique_ptr<rttr::CollectionInserterBase>> m_collectionInserters;
 	ContextPath m_contextPath;
 	bool m_isOk = false;
-	bool m_hackBackCopyCollectionItem = false;
 };
 
 } // namespace rs

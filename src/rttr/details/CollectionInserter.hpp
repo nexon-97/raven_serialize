@@ -6,7 +6,7 @@ namespace rttr
 
 struct CollectionInserterBase
 {
-	virtual void Insert(void* itemObject) = 0;
+	virtual void Insert(const void* itemObject) = 0;
 };
 
 template <class CollectionT, class ItemT>
@@ -19,9 +19,9 @@ struct CollectionStdBackInserter
 		: m_insertIterator(std::back_inserter(*static_cast<CollectionT*>(collection)))
 	{}
 
-	void Insert(void* itemObject) override
+	void Insert(const void* itemObject) override
 	{
-		ItemT* item = static_cast<ItemT*>(itemObject);
+		const ItemT* item = static_cast<const ItemT*>(itemObject);
 		m_insertIterator = *item;
 	}
 };
