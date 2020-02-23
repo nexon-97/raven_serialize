@@ -89,6 +89,12 @@ const std::size_t Type::GetArrayExtent(const std::size_t dimension) const
 	return m_typeData->typeParams.array_->arrayExtents[dimension];
 }
 
+Type Type::GetArrayType() const
+{
+	assert(m_typeData->typeClass == TypeClass::Array);
+	return m_typeData->typeParams.array_->arrayType;
+}
+
 Type Type::GetEnumUnderlyingType() const
 {
 	assert(m_typeData->typeClass == TypeClass::Enum);

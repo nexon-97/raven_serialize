@@ -151,6 +151,7 @@ public:
 	// Array type interface
 	const std::size_t RAVEN_SERIALIZE_API GetArrayRank() const;
 	const std::size_t RAVEN_SERIALIZE_API GetArrayExtent(const std::size_t dimension = 0U) const;
+	Type RAVEN_SERIALIZE_API GetArrayType() const;
 
 	//using ArrayIteratorFunc = std::function<void(const Type&, std::size_t, const void*)>;
 	//void RAVEN_SERIALIZE_API IterateArray(const void* value, const ArrayIteratorFunc& f) const;

@@ -25,18 +25,6 @@ namespace rttr
 template <typename T>
 Type Reflect();
 
-//template <typename T, std::size_t ...Is>
-//void FillArrayExtentImpl(std::size_t* arrayExtents, std::index_sequence<Is...>)
-//{
-//	((arrayExtents[std::integral_constant<std::size_t, Is>{}] = std::extent<T, Is>::value), ...);
-//}
-//
-//template <typename T>
-//void FillArrayExtent(std::size_t* arrayExtents)
-//{
-//	FillArrayExtentImpl<T>(arrayExtents, std::make_index_sequence<std::rank<T>::value>());
-//}
-
 template <typename T, typename Cond = void>
 struct DefaultInstanceAllocator
 {
@@ -85,152 +73,6 @@ struct DefaultInstanceDestructor<T[N]>
 		delete[] arrayPtr;
 	}
 };
-
-//template <typename T>
-//struct SmartPtrRawValueResolver
-//{
-//	void* operator()(void* value)
-//	{
-//		return nullptr;
-//	}
-//};
-//
-//template <typename T>
-//struct SmartPtrRawValueResolver<std::shared_ptr<T>>
-//{
-//	void* operator()(void* value)
-//	{
-//		std::shared_ptr<T>* smartptr = reinterpret_cast<std::shared_ptr<T>*>(value);
-//		return smartptr->get();
-//	}
-//};
-//
-//template <typename T>
-//struct SmartPtrRawValueResolver<std::unique_ptr<T>>
-//{
-//	void* operator()(void* value)
-//	{
-//		std::unique_ptr<T>* smartptr = reinterpret_cast<std::unique_ptr<T>*>(value);
-//		return smartptr->get();
-//	}
-//};
-//
-//template <typename T, typename Cond = void>
-//struct ArrayDataResolver
-//{
-//	ArrayDataResolver(type_data& metaTypeData) {}
-//};
-//
-//template <typename T>
-//void StlCollectionResize(void* collectionPtr, const std::size_t size)
-//{
-//	T* collection = reinterpret_cast<T*>(collectionPtr);
-//	collection->resize(size);
-//}
-//
-//template <typename T>
-//std::size_t GetStlCollectionSize(const void* collectionPtr)
-//{
-//	const T* collection = reinterpret_cast<const T*>(collectionPtr);
-//	return collection->size();
-//}
-//
-//template <typename T>
-//void* GetStlCollectionItem(const void* collectionPtr, const std::size_t idx)
-//{
-//	const T* collection = reinterpret_cast<const T*>(collectionPtr);
-//	return const_cast<void*>(reinterpret_cast<const void*>(collection->data() + idx));
-//}
-//
-//void RAVEN_SERIALIZE_API CollectionResizeNoop(void*, const std::size_t);
-//
-//template <typename T>
-//std::size_t GetStaticArraySize(const void* collectionPtr)
-//{
-//	return std::extent<T>::value;
-//}
-//
-//template <typename T>
-//void* GetStaticArrayItem(const void* collectionPtr, const std::size_t idx)
-//{
-//	using UnderlyingType = typename std::remove_extent<T>::type;
-//
-//	T* castedCollection = const_cast<T*>(reinterpret_cast<const T*>(collectionPtr));
-//	UnderlyingType* item = reinterpret_cast<UnderlyingType*>(castedCollection) + idx;
-//
-//	return reinterpret_cast<void*>(item);
-//}
-//
-//template <typename T>
-//void AssignSmartptrValue(void* smartptr, void* value)
-//{
-//	T* smartPtrCasted = reinterpret_cast<T*>(smartptr);
-//	auto dataPtr = reinterpret_cast<typename std::add_pointer<typename std::pointer_traits<T>::element_type>::type>(value);
-//	smartPtrCasted->reset(dataPtr);
-//}
-
-//template <typename T>
-//struct ArrayDataResolver<T, std::enable_if_t<is_std_vector<T>::value>>
-//{
-//	ArrayDataResolver(type_data& metaTypeData)
-//	{
-//		metaTypeData.arrayRank = 1U;
-//		metaTypeData.arrayTraits.isStdVector = true;
-//		metaTypeData.underlyingType[0] = new Type(Reflect<typename std_vector_type<T>::type>());
-//
-//		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
-//		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
-//
-//		// Fill dynamic array params
-//		static DynamicArrayParams dynamicArrayParams;
-//		dynamicArrayParams.resizeFunc = StlCollectionResize<T>;
-//		dynamicArrayParams.getSizeFunc = GetStlCollectionSize<T>;
-//		dynamicArrayParams.getItemFunc = GetStlCollectionItem<T>;
-//		metaTypeData.dynamicArrayParams = &dynamicArrayParams;
-//	}
-//};
-//
-//template <typename T>
-//struct ArrayDataResolver<T, std::enable_if_t<std::is_array<T>::value>>
-//{
-//	ArrayDataResolver(type_data& metaTypeData)
-//	{
-//		metaTypeData.arrayRank = std::rank<T>::value;
-//		metaTypeData.arrayTraits.isSimpleArray = true;
-//		metaTypeData.underlyingType[0] = new Type(Reflect<typename std::remove_all_extents_t<T>>());
-//
-//		metaTypeData.arrayExtents.reset(new std::size_t[metaTypeData.arrayRank]);
-//		FillArrayExtent<T>(metaTypeData.arrayExtents.get());
-//
-//		// Fill dynamic array params
-//		static DynamicArrayParams dynamicArrayParams;
-//		dynamicArrayParams.resizeFunc = CollectionResizeNoop;
-//		dynamicArrayParams.getSizeFunc = GetStaticArraySize<T>;
-//		dynamicArrayParams.getItemFunc = GetStaticArrayItem<T>;
-//		metaTypeData.dynamicArrayParams = &dynamicArrayParams;
-//	}
-//};
-
-//template <typename T, typename Cond = void>
-//struct SmartPointerTraitsResolver
-//{
-//	SmartPointerTraitsResolver(type_data& metaTypeData) {}
-//};
-//
-//template <typename T>
-//struct SmartPointerTraitsResolver<T, std::enable_if_t<is_smart_ptr<T>::value>>
-//{
-//	SmartPointerTraitsResolver(type_data& metaTypeData)
-//	{
-//		static SmartPtrParams smartptrParams;
-//		smartptrParams.smartptrTypeName = smart_ptr_type_name_resolver<T>()();
-//		smartptrParams.valueAssignFunc = AssignSmartptrValue<T>;
-//
-//		metaTypeData.underlyingType[0] = new Type(Reflect<typename smart_ptr_type<T>::type>());
-//		metaTypeData.smartPtrValueResolver = SmartPtrRawValueResolver<T>();
-//		metaTypeData.smartptrParams = &smartptrParams;
-//	}
-//};
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -348,7 +190,9 @@ public:
 			break;
 		case TypeClass::Array:
 			{
+				ArrayTraitsResolver<T> arrayTraitsResolver;
 				metaTypeData.typeParams.array_ = new ArrayParams();
+				arrayTraitsResolver(*metaTypeData.typeParams.array_);
 			}
 			break;
 		case TypeClass::Integral:

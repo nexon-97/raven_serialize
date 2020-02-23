@@ -78,6 +78,7 @@ private:
 	ReadResult ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
 	ReadResult ReadCollection(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
 	ReadResult ReadPointer(const rttr::Type& type, void* value, const Json::Value& jsonVal);
+	ReadResult ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
 	rttr::Type DeduceType(const Json::Value& jsonVal) const;
 	std::string GetObjectClassName(const Json::Value& jsonVal) const;

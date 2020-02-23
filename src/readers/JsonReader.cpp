@@ -363,6 +363,51 @@ JsonReader::ReadResult JsonReader::ReadProxy(rttr::TypeProxyData* proxyTypeData,
 	return result;
 }
 
+JsonReader::ReadResult JsonReader::ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+{
+	ReadResult result = k_readFailedGeneric;
+
+	if (jsonVal.isArray())
+	{
+		result = k_readSuccess;
+
+		rttr::Type arrayType = type.GetArrayType();
+		uint8_t* arrayBytePtr = static_cast<uint8_t*>(value);
+		std::size_t itemSize = arrayType.GetSize();
+
+		std::size_t totalSize = type.GetArrayExtent(0U);
+		for (std::size_t i = 1U; i < type.GetArrayRank(); ++i)
+		{
+			totalSize *= type.GetArrayExtent(i);
+		}
+
+		std::size_t i = 0U;
+		for (const Json::Value& arrayItemVal : jsonVal)
+		{
+			if (i >= totalSize)
+			{
+				Log::LogMessage("Actual json array doesn't fit in target array size!");
+				break;
+			}
+
+			uint8_t* itemPtr = arrayBytePtr + itemSize * i;
+			ReadResult itemResult = ReadImpl(arrayType, itemPtr, arrayItemVal);
+
+			if (!itemResult.Succeeded())
+			{
+				if (!itemResult.allEntitiesResolved)
+				{
+					result.allEntitiesResolved = false;
+				}
+			}
+
+			++i;
+		}
+	}
+
+	return result;
+}
+
 JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
 {
 	assert(m_isOk);
@@ -411,196 +456,156 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 			{
 				switch (type.GetTypeClass())
 				{
-				case rttr::TypeClass::Object:
-				{
-					result = k_readSuccess;
-
-					std::size_t propertiesCount = type.GetPropertiesCount();
-					ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
-					result.Merge(propertiesReadResult);
-
-					if (type.IsCollection())
+					case rttr::TypeClass::Object:
 					{
-						Log::LogMessage("Type '%s' is collection", type.GetName());
-						ReadResult collectionReadResult = ReadCollection(type, value, jsonVal, propertiesCount);
-						result.Merge(collectionReadResult);
-					}
-				}
-				break;
-				case rttr::TypeClass::Pointer:
-				{
-					ReadResult pointerReadResult = ReadPointer(type, value, jsonVal);
-					
-					// If we have read valid pointer, we notify calling code, that in the read chain there is a pointer that must be resolved later
-					if (pointerReadResult.Succeeded())
-					{
-						result.success = true;
-						result.allEntitiesResolved = false;
-					}
-					else
-					{
-						// If we failed to obtain the pointer description, we mark pointer as nullptr immediately and return not success
-						uintptr_t* ptrValue = static_cast<uintptr_t*>(value);
-						*ptrValue = 0;
-
-						result.success = false;
-						result.allEntitiesResolved = true;
-					}
-				}
-				break;
-				case rttr::TypeClass::Enum:
-				{
-					rttr::Type enumUnderlyingType = type.GetEnumUnderlyingType();
-					Log::LogMessage("Type is enum. Underlying type: '%s'", enumUnderlyingType.GetName());
-					result = ReadImpl(enumUnderlyingType, value, jsonVal);
-				}
-				break;
-				case rttr::TypeClass::Real:
-				{
-					double valueToAssign = 0.0;
-
-					if (jsonVal.isNumeric())
-					{
-						valueToAssign = jsonVal.asDouble();
 						result = k_readSuccess;
-					}
-					else
-					{
-						result = k_readFailedGeneric;
-					}
 
-					if (type.GetTypeIndex() == typeid(float))
-					{
-						*static_cast<float*>(value) = static_cast<float>(valueToAssign);
-					}
-					else
-					{
-						*static_cast<double*>(value) = valueToAssign;
-					}
-				}
-				break;
-				case rttr::TypeClass::Integral:
-				{
-					if (type.GetTypeIndex() == typeid(bool))
-					{
-						switch (jsonVal.type())
+						std::size_t propertiesCount = type.GetPropertiesCount();
+						ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
+						result.Merge(propertiesReadResult);
+
+						if (type.IsCollection())
 						{
-							case Json::booleanValue:
-								{
-									*static_cast<bool*>(value) = jsonVal.asBool();
-									result = k_readSuccess;
-								}
-								break;
-							case Json::intValue:
-							case Json::uintValue:
-							case Json::nullValue:
-								{
-									*static_cast<bool*>(value) = !!jsonVal.asUInt64();
-									result = k_readSuccess;
-								}
-								break;
+							Log::LogMessage("Type '%s' is collection", type.GetName());
+							ReadResult collectionReadResult = ReadCollection(type, value, jsonVal, propertiesCount);
+							result.Merge(collectionReadResult);
 						}
 					}
-					else
+					break;
+					case rttr::TypeClass::Pointer:
 					{
-						if (type.IsSignedIntegral())
+						ReadResult pointerReadResult = ReadPointer(type, value, jsonVal);
+					
+						// If we have read valid pointer, we notify calling code, that in the read chain there is a pointer that must be resolved later
+						if (pointerReadResult.Succeeded())
 						{
-							int64_t intValue = jsonVal.asInt64();
-							Log::LogMessage("Type is int. Value: %lld", intValue);
+							result.success = true;
+							result.allEntitiesResolved = false;
+						}
+						else
+						{
+							// If we failed to obtain the pointer description, we mark pointer as nullptr immediately and return not success
+							uintptr_t* ptrValue = static_cast<uintptr_t*>(value);
+							*ptrValue = 0;
 
-							switch (type.GetSize())
-							{
-							case 1:
-								*static_cast<int8_t*>(value) = static_cast<int8_t>(intValue);
-								break;
-							case 2:
-								*static_cast<int16_t*>(value) = static_cast<int16_t>(intValue);
-								break;
-							case 4:
-								*static_cast<int32_t*>(value) = static_cast<int32_t>(intValue);
-								break;
-							case 8:
-							default:
-								*static_cast<int64_t*>(value) = intValue;
-								break;
-							}
+							result.success = false;
+							result.allEntitiesResolved = true;
+						}
+					}
+					break;
+					case rttr::TypeClass::Enum:
+					{
+						rttr::Type enumUnderlyingType = type.GetEnumUnderlyingType();
+						Log::LogMessage("Type is enum. Underlying type: '%s'", enumUnderlyingType.GetName());
+						result = ReadImpl(enumUnderlyingType, value, jsonVal);
+					}
+					break;
+					case rttr::TypeClass::Real:
+					{
+						double valueToAssign = 0.0;
 
+						if (jsonVal.isNumeric())
+						{
+							valueToAssign = jsonVal.asDouble();
 							result = k_readSuccess;
 						}
 						else
 						{
-							uint64_t intValue = jsonVal.asUInt64();
-							Log::LogMessage("Type is uint. Value: %llu", intValue);
+							result = k_readFailedGeneric;
+						}
 
-							switch (type.GetSize())
-							{
-							case 1:
-								*static_cast<uint8_t*>(value) = static_cast<uint8_t>(intValue);
-								break;
-							case 2:
-								*static_cast<uint16_t*>(value) = static_cast<uint16_t>(intValue);
-								break;
-							case 4:
-								*static_cast<uint32_t*>(value) = static_cast<uint32_t>(intValue);
-								break;
-							case 8:
-							default:
-								*static_cast<uint64_t*>(value) = intValue;
-								break;
-							}
-
-							result = k_readSuccess;
+						if (type.GetTypeIndex() == typeid(float))
+						{
+							*static_cast<float*>(value) = static_cast<float>(valueToAssign);
+						}
+						else
+						{
+							*static_cast<double*>(value) = valueToAssign;
 						}
 					}
-				}
-				break;
+					break;
+					case rttr::TypeClass::Integral:
+					{
+						if (type.GetTypeIndex() == typeid(bool))
+						{
+							switch (jsonVal.type())
+							{
+								case Json::booleanValue:
+									{
+										*static_cast<bool*>(value) = jsonVal.asBool();
+										result = k_readSuccess;
+									}
+									break;
+								case Json::intValue:
+								case Json::uintValue:
+								case Json::nullValue:
+									{
+										*static_cast<bool*>(value) = !!jsonVal.asUInt64();
+										result = k_readSuccess;
+									}
+									break;
+							}
+						}
+						else
+						{
+							if (type.IsSignedIntegral())
+							{
+								int64_t intValue = jsonVal.asInt64();
+								Log::LogMessage("Type is int. Value: %lld", intValue);
+
+								switch (type.GetSize())
+								{
+								case 1:
+									*static_cast<int8_t*>(value) = static_cast<int8_t>(intValue);
+									break;
+								case 2:
+									*static_cast<int16_t*>(value) = static_cast<int16_t>(intValue);
+									break;
+								case 4:
+									*static_cast<int32_t*>(value) = static_cast<int32_t>(intValue);
+									break;
+								case 8:
+								default:
+									*static_cast<int64_t*>(value) = intValue;
+									break;
+								}
+
+								result = k_readSuccess;
+							}
+							else
+							{
+								uint64_t intValue = jsonVal.asUInt64();
+								Log::LogMessage("Type is uint. Value: %llu", intValue);
+
+								switch (type.GetSize())
+								{
+								case 1:
+									*static_cast<uint8_t*>(value) = static_cast<uint8_t>(intValue);
+									break;
+								case 2:
+									*static_cast<uint16_t*>(value) = static_cast<uint16_t>(intValue);
+									break;
+								case 4:
+									*static_cast<uint32_t*>(value) = static_cast<uint32_t>(intValue);
+									break;
+								case 8:
+								default:
+									*static_cast<uint64_t*>(value) = intValue;
+									break;
+								}
+
+								result = k_readSuccess;
+							}
+						}
+					}
+					break;
+					case rttr::TypeClass::Array:
+					{
+						result = ReadArray(type, value, jsonVal);
+					}
+					break;
 				}
 			}
-
-			//else if (type.IsSmartPointer())
-			//{
-			//	const Json::Value& smartPtrValue = jsonVal[k_smartptrPointedValueKey];
-			//	if (smartPtrValue.isObject())
-			//	{
-			//		std::size_t markerId = static_cast<std::size_t>(smartPtrValue[k_ptrMarkerKey].asUInt());
-			//		auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
-			//		m_actions.push_back(std::move(resolvePtrAction));
-			//	}
-			//}
-			//else if (type.IsArray())
-			//{
-			//	// Resize dynamic array
-			//	if (type.IsDynamicArray())
-			//	{
-			//		std::size_t count = jsonVal.size();
-			//		type.SetDynamicArraySize(value, count);
-			//	}
-
-			//	rttr::Type itemType = type.GetUnderlyingType();
-
-			//	std::size_t i = 0U;
-			//	for (const Json::Value& jsonItem : jsonVal)
-			//	{
-			//		m_contextPath.PushArrayItemAction(i);
-
-			//		void* itemValuePtr = type.GetArrayItemValuePtr(value, i);
-
-			//		//
-			//		auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(value));
-			//		auto itemAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(itemValuePtr));
-			//		auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-			//		Log::LogMessage("JsonReader [0x%llX] array item ptr: (array at 0x%llX, item at 0x%llX)", readerAsInt, valueAsInt, itemAsInt);
-
-			//		ReadImpl(itemType, itemValuePtr, jsonItem);
-			//		++i;
-
-			//		m_contextPath.PopAction();
-			//	}
-
-			//	// [DEBUG]
-			//	type.GetDynamicArraySize(value);
-			//}
-			//}
 		}
 	}
 
