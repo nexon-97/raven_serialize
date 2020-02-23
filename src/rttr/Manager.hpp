@@ -8,6 +8,8 @@
 #include "rttr/details/ObjectClassParams.hpp"
 #include "rttr/details/ScalarParams.hpp"
 #include "rttr/details/EnumParams.hpp"
+#include "rttr/GenericTypeSpecializer.hpp"
+#include "rttr/StlGenericTypesSpecializers.hpp"
 #include "helper/TypeTraitsExtension.hpp"
 #include "rs/log/Log.hpp"
 
@@ -378,6 +380,9 @@ public:
 		}
 
 		metaTypeData.debugValueViewer = &DebugValueViewerF<T>;
+
+		// Get class behavior from GenericTypeSpecializer possible specialization
+		GenericTypeSpecializer<T> genericTypeSpecializer(metaTypeData);
 	}
 
 	Type RAVEN_SERIALIZE_API GetMetaTypeByName(const char* name);

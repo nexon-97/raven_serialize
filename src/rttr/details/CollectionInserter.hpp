@@ -26,6 +26,23 @@ struct CollectionStdBackInserter
 	}
 };
 
+template <class CollectionT, class ItemT>
+struct CollectionStdInserter
+	: public CollectionInserterBase
+{
+	std::insert_iterator<CollectionT> m_insertIterator;
+
+	CollectionStdInserter(void* collection)
+		: m_insertIterator(std::inserter(*static_cast<CollectionT*>(collection), static_cast<CollectionT*>(collection)->end()))
+	{}
+
+	void Insert(const void* itemObject) override
+	{
+		const ItemT* item = static_cast<const ItemT*>(itemObject);
+		m_insertIterator = *item;
+	}
+};
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 class CollectionInserterFactory

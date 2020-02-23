@@ -10,8 +10,11 @@ local module_definition =
 	["files"] = { rv_serialize_src.."/**.cpp", rv_serialize_src.."/**.hpp" },
 	["include_dirs"] = { rv_serialize_src },
 	["defines"] = {},
-	["excludes"] = { rv_serialize_src.."/examples/**", rv_serialize_src.."/jsoncpp/**" },
-	["link_type"] = "dynamic",
+	["excludes"] = { rv_serialize_src.."/jsoncpp/**" },
 }
+
+if not SerializationStandalone then
+	table.insert(module_definition["excludes"], rv_serialize_src.."/examples/**")
+end
 
 registerModuleDef(module_definition)
