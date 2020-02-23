@@ -22,6 +22,19 @@ public:
 		: m_generatedType(type)
 	{}
 
+	template <typename ...Args>
+	TypeInitContext& Bases()
+	{
+		//static_assert(std::is_base_of_v<Args, T>, "Provided base class is not actual base class of type T!");
+		static_assert(sizeof...(Args) > 0U, "Empty bases list provided!");
+
+		assert(m_generatedType.GetBaseClasses().first == nullptr);
+		std::vector<Type> baseClasses = ReflectArgTypes<Args...>();
+		m_generatedType.SetBaseClasses(baseClasses.data(), static_cast<uint8_t>(baseClasses.size()));
+
+		return *this;
+	}
+
 	// Mark this type is serialized/deserialized as if it was another declared type
 	// To deserialize the type it have to declare a constructor that accepts proxy type lvalue or rvalue
 	// To serialize this type to proxy type, conversion function must be provided

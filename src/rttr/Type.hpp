@@ -33,26 +33,6 @@ std::unique_ptr<Property> CreateIndirectProperty(const char* name, GetterSignatu
 
 using MetaTypeInstanceAllocator = std::function<void*()>;
 using MetaTypeInstanceDestructor = std::function<void(void*)>;
-using PointerTypeIndexResolverFunc = std::function<std::type_index(void*)>;
-using SmartPtrValueResolver = std::function<void* (void*)>;
-using SmartPtrValueAssignFunc = std::function<void(void*, void*)>;
-
-struct SmartPtrParams
-{
-	const char* smartptrTypeName;
-	SmartPtrValueAssignFunc valueAssignFunc;
-};
-
-struct DynamicArrayParams
-{
-	using ArrayResizeFunc = std::function<void(void*, const std::size_t)>;
-	using ArrayGetSizeFunc = std::function<std::size_t(const void*)>;
-	using ArrayGetItemFunc = std::function<void*(const void*, const std::size_t)>;
-
-	ArrayResizeFunc resizeFunc;
-	ArrayGetSizeFunc getSizeFunc;
-	ArrayGetItemFunc getItemFunc;
-};
 
 template <typename ...Args>
 std::vector<Type> ReflectArgTypes();
@@ -75,13 +55,10 @@ struct type_data
 	const std::type_index typeIndex;
 	MetaTypeInstanceAllocator instanceAllocator;
 	MetaTypeInstanceDestructor instanceDestructor;
+	Type* bases = nullptr;
+	uint8_t basesCount = 0U;
 	bool isConst : 1;
 	bool isUserDefined : 1;
-	//SmartPtrParams* smartptrParams = nullptr;
-	//DynamicArrayParams* dynamicArrayParams = nullptr;
-	//Type* underlyingType[2];
-	//PointerTypeIndexResolverFunc pointerTypeIndexResolverFunc;
-	//SmartPtrValueResolver smartPtrValueResolver;
 	DebugValueViewer debugValueViewer = nullptr;
 
 	union TypeParams
@@ -113,11 +90,11 @@ public:
 	const std::size_t RAVEN_SERIALIZE_API GetId() const;
 	const std::size_t RAVEN_SERIALIZE_API GetSize() const;
 	RAVEN_SERIALIZE_API const std::type_index& GetTypeIndex() const;
+	std::pair<Type*, uint8_t> RAVEN_SERIALIZE_API GetBaseClasses() const;
+	const bool RAVEN_SERIALIZE_API IsConst() const;
 	std::size_t RAVEN_SERIALIZE_API GetHash() const;
 
 	const bool RAVEN_SERIALIZE_API IsValid() const;
-
-	const bool RAVEN_SERIALIZE_API IsConst() const;
 
 	// Constructor and destructor
 	RAVEN_SERIALIZE_API void* Instantiate() const;
@@ -153,16 +130,7 @@ public:
 	const std::size_t RAVEN_SERIALIZE_API GetArrayExtent(const std::size_t dimension = 0U) const;
 	Type RAVEN_SERIALIZE_API GetArrayType() const;
 
-	//using ArrayIteratorFunc = std::function<void(const Type&, std::size_t, const void*)>;
-	//void RAVEN_SERIALIZE_API IterateArray(const void* value, const ArrayIteratorFunc& f) const;
-	//std::size_t RAVEN_SERIALIZE_API GetDynamicArraySize(const void* value) const;
-	//void RAVEN_SERIALIZE_API SetDynamicArraySize(void* value, const std::size_t count) const;
-	//RAVEN_SERIALIZE_API void* GetArrayItemValuePtr(void* value, const std::size_t idx) const;
-
-	//RAVEN_SERIALIZE_API void* GetSmartPtrValue(void* value) const;
-	//std::type_index RAVEN_SERIALIZE_API GetPointerTypeIndex(void* value) const;
-	//RAVEN_SERIALIZE_API const char* GetSmartPtrTypeName() const;
-	//void RAVEN_SERIALIZE_API AssignPointerValue(void* pointer, void* value) const;
+	void RAVEN_SERIALIZE_API SetBaseClasses(Type* types, uint8_t count);
 
 	bool RAVEN_SERIALIZE_API operator==(const Type& other) const;
 	bool RAVEN_SERIALIZE_API operator!=(const Type& other) const;

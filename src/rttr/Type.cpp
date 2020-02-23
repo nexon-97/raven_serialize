@@ -139,6 +139,22 @@ const std::type_index& Type::GetTypeIndex() const
 	return m_typeData->typeIndex;
 }
 
+std::pair<Type*, uint8_t> Type::GetBaseClasses() const
+{
+	return std::pair<Type*, uint8_t>(m_typeData->bases, m_typeData->basesCount);
+}
+
+void Type::SetBaseClasses(Type* types, uint8_t count)
+{
+	m_typeData->bases = new Type[count];
+	m_typeData->basesCount = count;
+
+	for (uint8_t i = 0U; i < count; ++i)
+	{
+		m_typeData->bases[i] = types[i];
+	}
+}
+
 void Type::AddProperty(std::unique_ptr<Property>&& property)
 {
 	assert(m_typeData->typeClass == TypeClass::Object);
