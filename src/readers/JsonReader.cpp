@@ -23,48 +23,44 @@ const char* k_smartptrPointedValueKey = "ptr_value";
 const char* k_ptrMarkerKey = "$marker_id$";
 const char* k_collectionItemsKey = "$items$";
 
-struct StringJsonTypeResolver
+const rs::JsonReader::ReadResult k_readSuccess(true, true);
+const rs::JsonReader::ReadResult k_readFailedGeneric(false, true);
+
+struct StdStringJsonTypeResolver
 	: rs::JsonReader::PredefinedJsonTypeResolver
 {
 	void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) override
 	{
 		if (jsonVal.isNull())
 		{
-			if (type.GetTypeIndex() == typeid(std::string))
-			{
-				*static_cast<std::string*>(value) = std::string();
-			}
-			else if (type.GetTypeIndex() == typeid(std::wstring))
-			{
-				*static_cast<std::wstring*>(value) = std::wstring();
-			}
-			else if (type.GetTypeIndex() == typeid(const char*))
-			{
-				char** strSerializedValue = reinterpret_cast<char**>(value);
-				*strSerializedValue = nullptr;
-			}
+			*static_cast<std::string*>(value) = std::string();
+		}
+		else if (jsonVal.isString())
+		{
+			*static_cast<std::string*>(value) = std::move(jsonVal.asString());
+		}
+	}
+};
+
+struct ConstCharStringJsonTypeResolver
+	: rs::JsonReader::PredefinedJsonTypeResolver
+{
+	void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) override
+	{
+		if (jsonVal.isNull())
+		{
+			char** strSerializedValue = reinterpret_cast<char**>(value);
+			*strSerializedValue = nullptr;
 		}
 		else if (jsonVal.isString())
 		{
 			const char* strValue = jsonVal.asCString();
-
-			if (type.GetTypeIndex() == typeid(std::string))
-			{
-				*static_cast<std::string*>(value) = strValue;
-			}
-			else if (type.GetTypeIndex() == typeid(std::wstring))
-			{
-				//std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-				//*static_cast<std::wstring*>(value) = converter.from_bytes(strValue);
-			}
-			else if (type.GetTypeIndex() == typeid(const char*))
-			{
-				char** strSerializedValue = reinterpret_cast<char**>(value);
-				*strSerializedValue = const_cast<char*>(strValue);
-			}
+			char** strSerializedValue = reinterpret_cast<char**>(value);
+			*strSerializedValue = const_cast<char*>(strValue);
 		}
 	}
 };
+
 }
 
 namespace rs
@@ -95,9 +91,9 @@ JsonReader::JsonReader(std::istream& stream)
 	delete[] buffer;
 
 	// Register predefined types resolvers
-	m_predefinedJsonTypeResolvers.emplace(typeid(std::string), std::make_unique<StringJsonTypeResolver>());
-	m_predefinedJsonTypeResolvers.emplace(typeid(std::wstring), std::make_unique<StringJsonTypeResolver>());
-	m_predefinedJsonTypeResolvers.emplace(typeid(const char*), std::make_unique<StringJsonTypeResolver>());
+	m_predefinedJsonTypeResolvers.emplace(typeid(std::string), std::make_unique<StdStringJsonTypeResolver>());
+	//m_predefinedJsonTypeResolvers.emplace(typeid(std::wstring), std::make_unique<StdStringJsonTypeResolver<std::wstring>>());
+	m_predefinedJsonTypeResolvers.emplace(typeid(const char*), std::make_unique<ConstCharStringJsonTypeResolver>());
 }
 
 void JsonReader::SortActions()
@@ -114,7 +110,7 @@ void JsonReader::SortActions()
 		// Then, if the same class, go the deeper operations
 		return lhs->GetDepth() > rhs->GetDepth();
 	};
-	std::stable_sort(m_actions.begin(), m_actions.end(), predicate);
+	std::stable_sort(m_deferredCommandsList.begin(), m_deferredCommandsList.end(), predicate);
 }
 
 void JsonReader::Read(const rttr::Type& type, void* value)
@@ -181,8 +177,8 @@ void JsonReader::Read(const rttr::Type& type, void* value)
 	}
 
 	// Perform actions
-	SortActions();
-	for (const auto& action : m_actions)
+	//SortActions();
+	for (const auto& action : m_deferredCommandsList)
 	{
 		action->Perform();
 	}
@@ -194,36 +190,199 @@ void JsonReader::Read(const rttr::Type& type, void* value)
 	Log::LogMessage("=========\nJsonReader [0x%llX] ended reading session\n=========", readerAsInt);
 }
 
-void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+JsonReader::ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
 {
-	assert(m_isOk);
+	ReadResult result = k_readSuccess; // If we have no properties, it's OK
 
-	rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
-	if (nullptr != proxyTypeData)
+	for (std::size_t i = 0U; i < propertiesCount; ++i)
 	{
-		if (proxyTypeData->readConverter)
+		rttr::Property* property = type.GetProperty(i);
+		const rttr::Type& propertyType = property->GetType();
+		const char* propertyName = property->GetName();
+
+		Log::LogMessage("Reading property '%s::%s'", type.GetName(), propertyName);
+
+		if (jsonVal.isMember(propertyName))
 		{
-			// Create proxy object
-			void* proxyObject = m_context->CreateTempVariable(proxyTypeData->proxyType);
+			const Json::Value& itemJsonVal = jsonVal[propertyName];
 
-			// Read proxy object
-			ReadImpl(proxyTypeData->proxyType, proxyObject, jsonVal);
+			// Decide to create temp variable or not
+			void* propertyValuePtr = nullptr;
+			bool needsTempVar = property->NeedsTempVariable();
 
-			// Create target object using proxy constructor
-			proxyTypeData->readConverter->Convert(value, proxyObject);
+			if (needsTempVar)
+			{
+				propertyValuePtr = m_context->CreateTempVariable(property->GetType());
+			}
+			else
+			{
+				propertyValuePtr = property->GetValueAddress(value);
+			}
+
+			ReadResult propertyReadResult = ReadImpl(propertyType, propertyValuePtr, itemJsonVal);
+
+			if (propertyReadResult.Succeeded())
+			{
+				property->CallMutator(value, const_cast<void*>(propertyValuePtr));
+
+				if (needsTempVar)
+				{
+					m_context->DestroyTempVariable(propertyValuePtr);
+				}
+			}
+			else
+			{
+				if (!propertyReadResult.allEntitiesResolved)
+				{
+					// If not all property value entities are resolved, make use of deferred commands list
+					auto callMutatorAction = std::make_unique<detail::CallObjectMutatorAction>(m_contextPath.GetSize(), property, value, propertyValuePtr);
+					m_deferredCommandsList.push_back(std::move(callMutatorAction));
+
+					// Notify calling code that not all entities are resolved for this object
+					result.allEntitiesResolved = false;
+				}
+			}
 		}
 		else
 		{
-			Log::LogMessage("Type has proxy type, but no read converter defined!");
+			// If we couldn't find the property in json object, just log it, and produce no error
+			Log::LogMessage("Property '%s' not found in json object!", propertyName);
 		}
+	}
+
+	return result;
+}
+
+JsonReader::ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
+{
+	JsonReader::ReadResult result = k_readFailedGeneric;
+
+	// Pick correct json value to get objects from
+	Json::Value const* collectionItemsVal = nullptr;
+
+	if (propertiesCount == 0 && jsonVal.isArray())
+	{
+		// If this type has no properties, and declared as array in json, use it as items container
+		collectionItemsVal = &jsonVal;
+	}
+	else if (jsonVal.isObject() && jsonVal.isMember(k_collectionItemsKey))
+	{
+		// If this is a json object and has member with speicified name k_collectionItemsKey, use it as items container
+		collectionItemsVal = &jsonVal[k_collectionItemsKey];
+	}
+
+	if (collectionItemsVal && collectionItemsVal->isArray())
+	{
+		// We have correct json object with items data, now get collection traits from meta type
+		std::unique_ptr<rttr::CollectionInserterBase> inserter = type.CreateCollectionInserter(value);
+		rttr::Type collectionItemType = type.GetCollectionItemType();
+
+		if (inserter && collectionItemType.IsValid())
+		{
+			rttr::CollectionInserterBase* rawInserter = inserter.get();
+			m_collectionInserters.push_back(std::move(inserter));
+
+			// If we reach here, we have a valid collection
+			result.success = true;
+
+			int i = 0;
+			for (const Json::Value& jsonItem : *collectionItemsVal)
+			{
+				Log::LogMessage("Reading collection item %d", i);
+
+				void* collectionItem = m_context->CreateTempVariable(collectionItemType);
+				ReadResult itemReadResult = ReadImpl(collectionItemType, collectionItem, jsonItem);
+
+				if (itemReadResult.Succeeded())
+				{
+					// Item read successfully, so we can safely insert here and release item temp variable
+					rawInserter->Insert(collectionItem);
+					m_context->DestroyTempVariable(collectionItem);
+				}
+				else
+				{
+					Log::LogMessage("Collection item failed to be read!");
+
+					if (!itemReadResult.allEntitiesResolved)
+					{
+						// Notify caller that not all entities are resolved, and we must now defer actions using commands list
+						result.allEntitiesResolved = false;
+
+						// Not all entities of collection item are resolved, put insert command to deferred commands list
+						auto insertAction = std::make_unique<detail::CollectionInsertAction>(m_contextPath.GetSize(), rawInserter, collectionItem);
+						m_deferredCommandsList.push_back(std::move(insertAction));
+					}
+					
+					// For other error cases, we just skip the item and don't add it to final collection
+				}
+
+				++i;
+			}
+		}
+	}
+
+	return result;
+}
+
+JsonReader::ReadResult JsonReader::ReadPointer(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+{
+	ReadResult result = k_readFailedGeneric;
+
+	//if (jsonVal.isObject() && jsonVal.isMember(k_ptrMarkerKey))
+	//{
+	//	Log::LogMessage("Type is valid pointer");
+
+	//	std::size_t markerId = static_cast<std::size_t>(jsonVal[k_ptrMarkerKey].asUInt());
+	//	auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
+	//	m_deferredCommandsList.push_back(std::move(resolvePtrAction));
+	//}
+
+	return result;
+}
+
+JsonReader::ReadResult JsonReader::ReadProxy(rttr::TypeProxyData* proxyTypeData, void* value, const Json::Value& jsonVal)
+{
+	ReadResult result = k_readFailedGeneric;
+
+	if (proxyTypeData->readConverter)
+	{
+		// Create proxy object
+		void* proxyObject = m_context->CreateTempVariable(proxyTypeData->proxyType);
+
+		// Read proxy object
+		result = ReadImpl(proxyTypeData->proxyType, proxyObject, jsonVal);
+
+		// Create target object using proxy constructor
+		proxyTypeData->readConverter->Convert(value, proxyObject);
 	}
 	else
 	{
-		// Find in predefined types list
-		auto predefinedTypeIt = m_predefinedJsonTypeResolvers.find(type.GetTypeIndex());
-		if (predefinedTypeIt != m_predefinedJsonTypeResolvers.end())
+		Log::LogMessage("Type has proxy type, but no read converter defined!");
+	}
+
+	return result;
+}
+
+JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+{
+	assert(m_isOk);
+
+	ReadResult result = k_readFailedGeneric;
+
+	// Find in predefined types list
+	auto predefinedTypeIt = m_predefinedJsonTypeResolvers.find(type.GetTypeIndex());
+	if (predefinedTypeIt != m_predefinedJsonTypeResolvers.end())
+	{
+		predefinedTypeIt->second->Read(type, value, jsonVal);
+		result = k_readSuccess; // Check errors from predefined types
+	}
+	else
+	{
+		rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
+		if (nullptr != proxyTypeData)
 		{
-			predefinedTypeIt->second->Read(type, value, jsonVal);
+			Log::LogMessage("Type '%s' is read as proxy type '%s'", type.GetName(), proxyTypeData->proxyType.GetName());
+			result = ReadProxy(proxyTypeData, value, jsonVal);
 		}
 		else
 		{
@@ -246,7 +405,7 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 
 				auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
 					, type, value, serializedValueType, serializedValue, customTypeResolver);
-				m_actions.push_back(std::move(resolverAction));
+				m_deferredCommandsList.push_back(std::move(resolverAction));
 			}
 			else
 			{
@@ -254,107 +413,69 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 				{
 				case rttr::TypeClass::Object:
 				{
+					result = k_readSuccess;
+
 					std::size_t propertiesCount = type.GetPropertiesCount();
-
-					for (std::size_t i = 0U; i < propertiesCount; ++i)
-					{
-						rttr::Property* property = type.GetProperty(i);
-						const rttr::Type& propertyType = property->GetType();
-						const char* propertyName = property->GetName();
-
-						if (jsonVal.isMember(propertyName))
-						{
-							const Json::Value& itemJsonVal = jsonVal[propertyName];
-
-							m_contextPath.PushObjectPropertyAction(propertyName);
-
-							// Decide to create temp variable or not
-							void* propertyValuePtr = nullptr;
-							if (property->NeedsTempVariable())
-							{
-								propertyValuePtr = m_context->CreateTempVariable(property->GetType());
-							}
-							else
-							{
-								propertyValuePtr = property->GetValueAddress(value);
-							}
-
-							ReadImpl(propertyType, propertyValuePtr, itemJsonVal);
-
-							auto callMutatorAction = std::make_unique<detail::CallObjectMutatorAction>(m_contextPath.GetSize(), property, value, propertyValuePtr);
-							m_actions.push_back(std::move(callMutatorAction));
-
-							m_contextPath.PopAction();
-						}
-						else
-						{
-							// [TODO] Log property read error here
-						}
-					}
+					ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
+					result.Merge(propertiesReadResult);
 
 					if (type.IsCollection())
 					{
-						Json::Value const* collectionItemsVal = nullptr;
-						std::unique_ptr<rttr::CollectionInserterBase> inserter = type.CreateCollectionInserter(value);
-						rttr::Type collectionItemType = type.GetCollectionItemType();
-
-						if (propertiesCount == 0 && jsonVal.isArray())
-						{
-							collectionItemsVal = &jsonVal;
-						}
-						else if (jsonVal.isObject() && jsonVal.isMember(k_collectionItemsKey))
-						{
-							collectionItemsVal = &jsonVal[k_collectionItemsKey];
-						}
-
-						if (collectionItemsVal && inserter && collectionItemType.IsValid())
-						{
-							rttr::CollectionInserterBase* rawInserter = inserter.get();
-							m_collectionInserters.push_back(std::move(inserter));
-
-							for (const Json::Value& jsonItem : *collectionItemsVal)
-							{
-								m_contextPath.PushObjectPropertyAction("CollectionItem");
-
-								void* collectionItem = m_context->CreateTempVariable(collectionItemType);
-								ReadImpl(collectionItemType, collectionItem, jsonItem);
-
-								auto insertAction = std::make_unique<detail::CollectionInsertAction>(m_contextPath.GetSize(), rawInserter, collectionItem);
-								m_actions.push_back(std::move(insertAction));
-
-								m_contextPath.PopAction();
-							}
-						}
+						Log::LogMessage("Type '%s' is collection", type.GetName());
+						ReadResult collectionReadResult = ReadCollection(type, value, jsonVal, propertiesCount);
+						result.Merge(collectionReadResult);
 					}
 				}
 				break;
 				case rttr::TypeClass::Pointer:
 				{
-					if (jsonVal.isObject() && jsonVal.isMember(k_ptrMarkerKey))
+					ReadResult pointerReadResult = ReadPointer(type, value, jsonVal);
+					
+					// If we have read valid pointer, we notify calling code, that in the read chain there is a pointer that must be resolved later
+					if (pointerReadResult.Succeeded())
 					{
-						std::size_t markerId = static_cast<std::size_t>(jsonVal[k_ptrMarkerKey].asUInt());
-						auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
-						m_actions.push_back(std::move(resolvePtrAction));
+						result.success = true;
+						result.allEntitiesResolved = false;
+					}
+					else
+					{
+						// If we failed to obtain the pointer description, we mark pointer as nullptr immediately and return not success
+						uintptr_t* ptrValue = static_cast<uintptr_t*>(value);
+						*ptrValue = 0;
+
+						result.success = false;
+						result.allEntitiesResolved = true;
 					}
 				}
 				break;
 				case rttr::TypeClass::Enum:
 				{
 					rttr::Type enumUnderlyingType = type.GetEnumUnderlyingType();
-					ReadImpl(enumUnderlyingType, value, jsonVal);
+					Log::LogMessage("Type is enum. Underlying type: '%s'", enumUnderlyingType.GetName());
+					result = ReadImpl(enumUnderlyingType, value, jsonVal);
 				}
 				break;
 				case rttr::TypeClass::Real:
 				{
-					double floatValue = jsonVal.asDouble();
+					double valueToAssign = 0.0;
 
-					if (type.GetTypeIndex() == typeid(float))
+					if (jsonVal.isNumeric())
 					{
-						*static_cast<float*>(value) = static_cast<float>(floatValue);
+						valueToAssign = jsonVal.asDouble();
+						result = k_readSuccess;
 					}
 					else
 					{
-						*static_cast<double*>(value) = floatValue;
+						result = k_readFailedGeneric;
+					}
+
+					if (type.GetTypeIndex() == typeid(float))
+					{
+						*static_cast<float*>(value) = static_cast<float>(valueToAssign);
+					}
+					else
+					{
+						*static_cast<double*>(value) = valueToAssign;
 					}
 				}
 				break;
@@ -362,13 +483,30 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 				{
 					if (type.GetTypeIndex() == typeid(bool))
 					{
-						*static_cast<bool*>(value) = jsonVal.asBool();
+						switch (jsonVal.type())
+						{
+							case Json::booleanValue:
+								{
+									*static_cast<bool*>(value) = jsonVal.asBool();
+									result = k_readSuccess;
+								}
+								break;
+							case Json::intValue:
+							case Json::uintValue:
+							case Json::nullValue:
+								{
+									*static_cast<bool*>(value) = !!jsonVal.asUInt64();
+									result = k_readSuccess;
+								}
+								break;
+						}
 					}
 					else
 					{
 						if (type.IsSignedIntegral())
 						{
 							int64_t intValue = jsonVal.asInt64();
+							Log::LogMessage("Type is int. Value: %lld", intValue);
 
 							switch (type.GetSize())
 							{
@@ -386,10 +524,13 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 								*static_cast<int64_t*>(value) = intValue;
 								break;
 							}
+
+							result = k_readSuccess;
 						}
 						else
 						{
 							uint64_t intValue = jsonVal.asUInt64();
+							Log::LogMessage("Type is uint. Value: %llu", intValue);
 
 							switch (type.GetSize())
 							{
@@ -407,6 +548,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 								*static_cast<uint64_t*>(value) = intValue;
 								break;
 							}
+
+							result = k_readSuccess;
 						}
 					}
 				}
@@ -460,6 +603,8 @@ void JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value
 			//}
 		}
 	}
+
+	return result;
 }
 
 bool JsonReader::IsOk() const

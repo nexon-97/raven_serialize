@@ -3,6 +3,8 @@
 #include "rttr/Property.hpp"
 #include "ptr/IPointerFiller.hpp"
 
+#include <unordered_map>
+
 namespace rs
 {
 namespace detail
@@ -28,11 +30,12 @@ public:
 	RAVEN_SERIALIZE_API const std::vector<ObjectData>& GetObjects() const;
 
 	RAVEN_SERIALIZE_API void* CreateTempVariable(const rttr::Type& type);
+	void RAVEN_SERIALIZE_API DestroyTempVariable(void* ptr);
 	void RAVEN_SERIALIZE_API ClearTempVariables();
 
 private:
 	std::vector<ObjectData> m_objects;
-	std::vector<std::pair<rttr::Type, void*>> m_tempVariables;
+	std::unordered_map<void*, rttr::Type> m_tempVariables;
 };
 
 } // namespace detail

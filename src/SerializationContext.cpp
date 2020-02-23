@@ -23,7 +23,7 @@ std::size_t SerializationContext::AddObject(const rttr::Type& type, const void* 
 	auto it = std::find_if(m_objects.begin(), m_objects.end(), predicate);
 	if (it == m_objects.end())
 	{
-		// Ojbect not found, create new entry
+		// Object not found, create new entry
 		std::size_t objectId = m_objects.size();
 		m_objects.emplace_back(type, objectPtr, objectId);
 
@@ -70,18 +70,31 @@ void* SerializationContext::CreateTempVariable(const rttr::Type& type)
 	auto varAddressAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(temp));
 	Log::LogMessage("Temp variable created: (%s; 0x%llX)", type.GetName(), varAddressAsInt);
 
-	m_tempVariables.emplace_back(type, temp);
+	m_tempVariables.emplace(temp, type);
 	return temp;
+}
+
+void SerializationContext::DestroyTempVariable(void* ptr)
+{
+	auto it = m_tempVariables.find(ptr);
+	if (it != m_tempVariables.end())
+	{
+		auto varAddressAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(ptr));
+		Log::LogMessage("Temp variable destroyed: (%s; 0x%llX)", it->second.GetName(), varAddressAsInt);
+
+		it->second.Destroy(ptr);
+		m_tempVariables.erase(it);
+	}
 }
 
 void SerializationContext::ClearTempVariables()
 {
 	for (const auto& tempVar : m_tempVariables)
 	{
-		auto varAddressAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(tempVar.second));
-		Log::LogMessage("Temp variable destroyed: (%s; 0x%llX)", tempVar.first.GetName(), varAddressAsInt);
+		auto varAddressAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(tempVar.first));
+		Log::LogMessage("Temp variable destroyed: (%s; 0x%llX)", tempVar.second.GetName(), varAddressAsInt);
 
-		tempVar.first.Destroy(tempVar.second);
+		tempVar.second.Destroy(tempVar.first);
 	}
 	m_tempVariables.clear();
 }

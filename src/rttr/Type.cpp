@@ -49,7 +49,12 @@ const bool Type::IsValid() const
 
 const char* Type::GetName() const
 {
-	return m_typeData->name;
+	if (m_typeData)
+	{
+		return m_typeData->name;
+	}
+	
+	return "<None>";
 }
 
 const std::size_t Type::GetId() const
