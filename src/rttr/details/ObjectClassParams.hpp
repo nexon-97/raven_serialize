@@ -10,21 +10,6 @@ namespace rttr
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-//template <class It, class T>
-//using CollectionIteratorGetter = It(T::*)();
-//
-//template <class T, class It>
-//struct CollectionIterationData
-//{
-//	CollectionIteratorGetter<It, T> beginMethod;
-//	CollectionIteratorGetter<It, T> endMethod;
-//};
-//
-//struct CollectionWriteContext
-//{
-//	//virtual std::vector<> WriteCollection(void* collection);
-//};
-
 struct CollectionParams
 {
 	std::unique_ptr<CollectionInserterFactory> inserterFactory;
@@ -35,6 +20,7 @@ struct ObjectClassParams
 {
 	std::vector<std::unique_ptr<Property>> properties;
 	std::unique_ptr<CollectionParams> collectionParams;
+	bool isPolymorphic = false;
 };
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +74,8 @@ struct ObjectTraitsResolver<T, std::enable_if_t<std::is_class_v<T>>>
 {
 	void operator()(ObjectClassParams& params)
 	{
+		params.isPolymorphic = std::is_polymorphic_v<T>;
+
 		CollectionTraitsResolver<T> collectionTraitsResolver;
 		collectionTraitsResolver(params);
 	}

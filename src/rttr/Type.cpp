@@ -77,6 +77,16 @@ const bool Type::IsConst() const
 	return m_typeData->isConst;
 }
 
+bool Type::IsPolymorphic() const
+{
+	if (m_typeData->typeClass == TypeClass::Object)
+	{
+		return m_typeData->typeParams.object->isPolymorphic;
+	}
+
+	return false;
+}
+
 const std::size_t Type::GetArrayRank() const
 {
 	assert(m_typeData->typeClass == TypeClass::Array);

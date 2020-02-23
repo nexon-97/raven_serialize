@@ -92,6 +92,7 @@ public:
 	RAVEN_SERIALIZE_API const std::type_index& GetTypeIndex() const;
 	std::pair<Type*, uint8_t> RAVEN_SERIALIZE_API GetBaseClasses() const;
 	const bool RAVEN_SERIALIZE_API IsConst() const;
+	bool RAVEN_SERIALIZE_API IsPolymorphic() const;
 	std::size_t RAVEN_SERIALIZE_API GetHash() const;
 
 	const bool RAVEN_SERIALIZE_API IsValid() const;
