@@ -47,7 +47,7 @@ Type Manager::GetMetaTypeByTypeIndex(const std::type_index& typeIndex)
 
 void Manager::RegisterProxyType(const Type& type, const Type& proxyType)
 {
-	m_proxyTypes.emplace(type, proxyType);
+	m_proxyTypes.emplace(type, std::make_unique<TypeProxyData>(proxyType));
 }
 
 TypeProxyData* Manager::GetProxyType(const Type& type)
@@ -55,7 +55,23 @@ TypeProxyData* Manager::GetProxyType(const Type& type)
 	auto it = m_proxyTypes.find(type);
 	if (it != m_proxyTypes.end())
 	{
-		return &(it->second);
+		return it->second.get();
+	}
+
+	return nullptr;
+}
+
+void Manager::RegisterSerializationAdapter(const Type& type, std::unique_ptr<rs::SerializationAdapter>&& adapter)
+{
+	m_serializationAdapters.emplace(type, std::move(adapter));
+}
+
+rs::SerializationAdapter* Manager::GetSerializationAdapter(const Type& type)
+{
+	auto it = m_serializationAdapters.find(type);
+	if (it != m_serializationAdapters.end())
+	{
+		return it->second.get();
 	}
 
 	return nullptr;

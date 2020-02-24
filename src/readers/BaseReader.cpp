@@ -84,11 +84,6 @@ void BaseReader::Read(const rttr::Type& type, void* value)
 	m_context.reset();
 }
 
-void BaseReader::AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver)
-{
-	m_customTypeResolvers.emplace(type.GetTypeIndex(), resolver);
-}
-
 void BaseReader::FilterReferencedObjectsList(std::vector<std::pair<uint64_t, rttr::Type>>& objectsList)
 {
 	for (auto it = objectsList.begin(); it != objectsList.end();)

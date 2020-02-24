@@ -15,6 +15,7 @@
 namespace rs
 {
 class ICustomPropertyResolvePolicy;
+class SerializationAdapter;
 }
 
 namespace rttr
@@ -92,6 +93,8 @@ public:
 	RAVEN_SERIALIZE_API const std::type_index& GetTypeIndex() const;
 	std::pair<Type*, uint8_t> RAVEN_SERIALIZE_API GetBaseClasses() const;
 	bool RAVEN_SERIALIZE_API IsBaseClass(const Type& other) const;
+	void RAVEN_SERIALIZE_API SetSerializationAdapter(std::unique_ptr<rs::SerializationAdapter>&& adapter) const;
+	RAVEN_SERIALIZE_API rs::SerializationAdapter* GetSerializationAdapter() const;
 	const bool RAVEN_SERIALIZE_API IsConst() const;
 	bool RAVEN_SERIALIZE_API IsPolymorphic() const;
 	std::size_t RAVEN_SERIALIZE_API GetHash() const;

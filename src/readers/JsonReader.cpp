@@ -545,25 +545,30 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 		else
 		{
 			// Find custom type resolver for this type
-			auto customResolverIt = m_customTypeResolvers.find(type.GetTypeIndex());
-			if (customResolverIt != m_customTypeResolvers.end())
+			SerializationAdapter* adapter = rttr::Manager::GetRTTRManager().GetSerializationAdapter(type);
+			if (nullptr != adapter)
 			{
-				//rttr::CustomTypeResolver* customTypeResolver = customResolverIt->second;
+				// Parse payload
+				SerializationAdapter::DataChunk payload;
+				payload.type = adapter->GetPayloadType();
 
-				//// Serialized value type
-				//rttr::Type serializedValueType = DeduceType(jsonVal);
-				//void* serializedValue = nullptr;
+				if (payload.type.IsValid() && jsonVal.isMember(K_ADAPTER))
+				{
+					payload.value = m_context->CreateTempVariable(payload.type);
+					ReadResult payloadReadResult = ReadImpl(payload.type, payload.value, jsonVal[K_ADAPTER]);
+				}
 
-				//// Deserialize custom value from data source to pass to resolver
-				//if (serializedValueType.GetTypeIndex() != typeid(nullptr_t))
-				//{
-				//	serializedValue = m_context->CreateTempVariable(serializedValueType);
-				//	ReadImpl(serializedValueType, serializedValue, jsonVal);
-				//}
+				// Perform adapter logic
+				SerializationAdapter::AdapterReadOutput adapterOutput = adapter->ReadConvert(payload);
 
-				//auto resolverAction = std::make_unique<detail::CustomResolverAction>(0
-				//	, type, value, serializedValueType, serializedValue, customTypeResolver);
-				//m_deferredCommandsList.push_back(std::move(resolverAction));
+				// Read json value as converted type
+				if (adapterOutput.convertedType.IsValid())
+				{
+					void* adapterValue = m_context->CreateTempVariable(adapterOutput.convertedType);
+					result = ReadImpl(adapterOutput.convertedType, adapterValue, jsonVal);
+
+					adapter->ReadFinalize(adapterValue, value, adapterOutput, payload);
+				}
 			}
 			else
 			{

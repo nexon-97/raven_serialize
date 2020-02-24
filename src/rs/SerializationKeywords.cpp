@@ -43,4 +43,9 @@ const char* SerializationKeywords::BaseId()
 	return "$base$";
 }
 
+const char* SerializationKeywords::AdapterData()
+{
+	return "$adapter$";
+}
+
 }

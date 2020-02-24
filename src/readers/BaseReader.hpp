@@ -24,7 +24,6 @@ class BaseReader
 {
 public:
 	void RAVEN_SERIALIZE_API Read(const rttr::Type& type, void* value) final;
-	void AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) override;
 
 protected:
 	// Removes data about objects that had already been loaded
@@ -34,7 +33,6 @@ protected:
 	virtual bool CheckSourceHasObjectsList() = 0;
 
 protected:
-	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
 	std::vector<std::pair<uint64_t, rttr::Type>> m_referencedContextObjects;
 	std::vector<std::unique_ptr<detail::IReaderAction>> m_deferredCommandsList;

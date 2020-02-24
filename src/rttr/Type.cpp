@@ -6,7 +6,6 @@
 #include "rttr/details/ArrayParams.hpp"
 #include "rttr/details/ScalarParams.hpp"
 #include "rttr/details/EnumParams.hpp"
-#include "rs/ICustomPropertyResolvePolicy.hpp"
 
 namespace rttr
 {
@@ -152,6 +151,16 @@ std::size_t Type::GetPropertiesCount() const
 const std::type_index& Type::GetTypeIndex() const
 {
 	return m_typeData->typeIndex;
+}
+
+void Type::SetSerializationAdapter(std::unique_ptr<rs::SerializationAdapter>&& adapter) const
+{
+	Manager::GetRTTRManager().RegisterSerializationAdapter(Type(m_typeData), std::move(adapter));
+}
+
+rs::SerializationAdapter* Type::GetSerializationAdapter() const
+{
+	return Manager::GetRTTRManager().GetSerializationAdapter(Type(m_typeData));
 }
 
 std::pair<Type*, uint8_t> Type::GetBaseClasses() const

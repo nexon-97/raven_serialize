@@ -1,6 +1,7 @@
 #pragma once
 #include "rttr/Type.hpp"
 #include "rttr/ProxyConverter.hpp"
+#include "rs/SerializationAdapter.hpp"
 
 namespace rttr
 {
@@ -127,6 +128,18 @@ public:
 	{
 		std::unique_ptr<Property> propertyInstance = std::make_unique<rttr::CustomProperty>(name, policy, policy->GetType());
 		m_generatedType.AddProperty(std::move(propertyInstance));
+
+		return *this;
+	}
+
+	template <class AdapterT>
+	TypeInitContext& SetSerializationAdapter()
+	{
+		static_assert(std::is_base_of_v<rs::SerializationAdapter, AdapterT>, "Adapter type is not based on rs::SerializationAdapter!");
+
+		// Check if current type doesn't have proxy, as multiple proxies are not allowed
+		assert(nullptr == m_generatedType.GetSerializationAdapter());
+		m_generatedType.SetSerializationAdapter(std::make_unique<AdapterT>());
 
 		return *this;
 	}

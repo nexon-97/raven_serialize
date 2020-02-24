@@ -14,6 +14,7 @@ public:
 	static const char* CollectionItems();
 	static const char* Bases();
 	static const char* BaseId();
+	static const char* AdapterData();
 };
 
 }
@@ -26,3 +27,4 @@ public:
 #define K_COLLECTION_ITEMS rs::SerializationKeywords::CollectionItems()
 #define K_BASES rs::SerializationKeywords::Bases()
 #define K_BASE_ID rs::SerializationKeywords::BaseId()
+#define K_ADAPTER rs::SerializationKeywords::AdapterData()

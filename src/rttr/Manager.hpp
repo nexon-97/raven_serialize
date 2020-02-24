@@ -238,6 +238,9 @@ public:
 	void RAVEN_SERIALIZE_API RegisterProxyType(const Type& type, const Type& proxyType);
 	RAVEN_SERIALIZE_API TypeProxyData* GetProxyType(const Type& type);
 
+	void RAVEN_SERIALIZE_API RegisterSerializationAdapter(const Type& type, std::unique_ptr<rs::SerializationAdapter>&& adapter);
+	RAVEN_SERIALIZE_API rs::SerializationAdapter* GetSerializationAdapter(const Type& type);
+
 	static RAVEN_SERIALIZE_API Manager& GetRTTRManager();
 
 private:
@@ -246,7 +249,8 @@ private:
 private:
 	std::unordered_map<std::type_index, std::unique_ptr<type_data>> m_types;
 	std::unordered_map<std::string, type_data*> m_typeNames;
-	std::unordered_map<Type, TypeProxyData> m_proxyTypes;
+	std::unordered_map<Type, std::unique_ptr<TypeProxyData>> m_proxyTypes;
+	std::unordered_map<Type, std::unique_ptr<rs::SerializationAdapter>> m_serializationAdapters;
 	std::size_t m_nextId = 0U;
 };
 
