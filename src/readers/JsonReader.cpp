@@ -2,8 +2,7 @@
 #include "rttr/Property.hpp"
 #include "rttr/CustomTypeResolver.hpp"
 #include "rttr/Manager.hpp"
-#include "ptr/DefaultPointerFiller.hpp"
-#include "ptr/PropertyPointerFiller.hpp"
+#include "rs/SerializationKeywords.hpp"
 #include "actions/CallObjectMutatorAction.hpp"
 #include "actions/ResolvePointerAction.hpp"
 #include "actions/CustomResolverAction.hpp"
@@ -14,14 +13,6 @@
 
 namespace
 {
-
-// Reserved serialization keywords
-const char* k_typeId = "$type$";
-const char* k_contextMasterObjectKey = "$master_obj$";
-const char* k_contextObjectsKey = "$objects$";
-const char* k_contextIdKey = "$id$";
-const char* k_contextValKey = "$val$";
-const char* k_collectionItemsKey = "$items$";
 
 //////////////////////////////////////////////////////////////////////////////////
 // Predefined Json type resolvers implementation
@@ -140,9 +131,9 @@ Json::Value const* JsonReader::FindContextJsonObject(const Json::Value& jsonRoot
 {
 	for (const Json::Value& val : jsonRoot)
 	{
-		if (val.isObject() && val.isMember(k_contextIdKey) && val.isMember(k_contextValKey))
+		if (val.isObject() && val.isMember(K_CONTEXT_OBJ_ID) && val.isMember(K_CONTEXT_OBJ_VAL))
 		{
-			if (val[k_contextIdKey].asUInt64() == id)
+			if (val[K_CONTEXT_OBJ_ID].asUInt64() == id)
 			{
 				return &val;
 			}
@@ -154,11 +145,11 @@ Json::Value const* JsonReader::FindContextJsonObject(const Json::Value& jsonRoot
 
 void JsonReader::ReadContextObject(const rttr::Type& type, void* value, const Json::Value& jsonVal)
 {
-	ReadResult objectReadResult = ReadImpl(type, value, jsonVal[k_contextValKey]);
+	ReadResult objectReadResult = ReadImpl(type, value, jsonVal[K_CONTEXT_OBJ_VAL]);
 
 	if (objectReadResult.success)
 	{
-		uint64_t objectId = (jsonVal[k_contextIdKey]).asUInt64();
+		uint64_t objectId = (jsonVal[K_CONTEXT_OBJ_ID]).asUInt64();
 		m_context->AddObject(objectId, type, value);
 	}
 	else
@@ -169,18 +160,18 @@ void JsonReader::ReadContextObject(const rttr::Type& type, void* value, const Js
 
 void JsonReader::DoRead(const rttr::Type& type, void* value)
 {
-	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(k_contextObjectsKey) && m_jsonRoot.isMember(k_contextMasterObjectKey));
+	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(K_CONTEXT_OBJECTS) && m_jsonRoot.isMember(K_MASTER_OBJ_ID));
 	if (hasObjectsList)
 	{
 		// Parse objects list
-		const Json::Value& contextObjectsVal = m_jsonRoot[k_contextObjectsKey];
-		uint64_t masterObjectId = m_jsonRoot[k_contextMasterObjectKey].asUInt64();
+		const Json::Value& contextObjectsVal = m_jsonRoot[K_CONTEXT_OBJECTS];
+		uint64_t masterObjectId = m_jsonRoot[K_MASTER_OBJ_ID].asUInt64();
 		Json::Value const* masterObjectVal = nullptr;
 
 		// Find master object json val
 		for (const Json::Value& contextObjectVal : contextObjectsVal)
 		{
-			if (contextObjectVal.isMember(k_contextIdKey) && contextObjectVal.isMember(k_contextValKey) && contextObjectVal[k_contextIdKey].asUInt64() == masterObjectId)
+			if (contextObjectVal.isMember(K_CONTEXT_OBJ_ID) && contextObjectVal.isMember(K_CONTEXT_OBJ_VAL) && contextObjectVal[K_CONTEXT_OBJ_ID].asUInt64() == masterObjectId)
 			{
 				masterObjectVal = &contextObjectVal;
 				break;
@@ -236,7 +227,7 @@ void JsonReader::DoRead(const rttr::Type& type, void* value)
 
 bool JsonReader::CheckSourceHasObjectsList()
 {
-	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(k_contextObjectsKey) && m_jsonRoot.isMember(k_contextMasterObjectKey));
+	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(K_CONTEXT_OBJECTS) && m_jsonRoot.isMember(K_MASTER_OBJ_ID));
 	return hasObjectsList;
 }
 
@@ -315,10 +306,10 @@ ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const
 		// If this type has no properties, and declared as array in json, use it as items container
 		collectionItemsVal = &jsonVal;
 	}
-	else if (jsonVal.isObject() && jsonVal.isMember(k_collectionItemsKey))
+	else if (jsonVal.isObject() && jsonVal.isMember(K_COLLECTION_ITEMS))
 	{
 		// If this is a json object and has member with speicified name k_collectionItemsKey, use it as items container
-		collectionItemsVal = &jsonVal[k_collectionItemsKey];
+		collectionItemsVal = &jsonVal[K_COLLECTION_ITEMS];
 	}
 
 	if (collectionItemsVal && collectionItemsVal->isArray())

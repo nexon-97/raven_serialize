@@ -1,7 +1,6 @@
 #pragma once
 #include "rttr/Type.hpp"
 #include "rttr/Property.hpp"
-#include "ptr/IPointerFiller.hpp"
 
 #include <unordered_map>
 
