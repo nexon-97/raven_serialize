@@ -159,6 +159,27 @@ std::pair<Type*, uint8_t> Type::GetBaseClasses() const
 	return std::pair<Type*, uint8_t>(m_typeData->bases, m_typeData->basesCount);
 }
 
+bool Type::IsBaseClass(const Type& other) const
+{
+	if (m_typeData->basesCount > 0)
+	{
+		for (uint8_t i = 0U; i < m_typeData->basesCount; ++i)
+		{
+			if (m_typeData->bases[i] == other)
+			{
+				return true;
+			}
+
+			if (m_typeData->bases[i].IsBaseClass(other))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void Type::SetBaseClasses(Type* types, uint8_t count)
 {
 	m_typeData->bases = new Type[count];

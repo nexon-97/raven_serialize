@@ -51,7 +51,6 @@ private:
 	ReadResult ReadPointer(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	ReadResult ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
-	rttr::Type DeduceType(const Json::Value& jsonVal) const;
 	void SortActions();
 
 private:

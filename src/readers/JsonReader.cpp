@@ -192,20 +192,39 @@ void JsonReader::DoRead(const rttr::Type& type, void* value)
 					bool objectAlreadyLoaded = !!m_context->GetObjectById(objectReference.first);
 					if (!objectAlreadyLoaded)
 					{
+						bool contextObjectValid = false;
+
 						// Find object in context
 						Json::Value const* contextJsonObjectPtr = FindContextJsonObject(contextObjectsVal, objectReference.first);
 						if (nullptr != contextJsonObjectPtr)
 						{
+							const Json::Value& contextJsonObject = *contextJsonObjectPtr;
 							rttr::Type pointedType = objectReference.second;
+
 							if (pointedType.IsValid())
 							{
+								// Check actual type of polymorphic type
+								if (pointedType.IsPolymorphic() && contextJsonObject[K_CONTEXT_OBJ_VAL].isMember(K_TYPE_ID))
+								{
+									rttr::Type deducedType = rttr::Reflect(contextJsonObject[K_CONTEXT_OBJ_VAL][K_TYPE_ID].asCString());
+									if (deducedType.IsValid() && deducedType.IsBaseClass(pointedType))
+									{
+										pointedType = deducedType;
+									}
+								}
+
 								void* pointedValue = pointedType.Instantiate();
-								ReadContextObject(pointedType, pointedValue, *contextJsonObjectPtr);
+								if (nullptr != pointedValue)
+								{
+									ReadContextObject(pointedType, pointedValue, contextJsonObject);
+									contextObjectValid = true;
+								}
 							}
-							else
-							{
-								m_context->AddObject(objectReference.first, pointedType, nullptr);
-							}
+						}
+
+						if (!contextObjectValid)
+						{
+							m_context->AddObject(objectReference.first, objectReference.second, nullptr);
 						}
 					}
 				}
@@ -529,22 +548,22 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 			auto customResolverIt = m_customTypeResolvers.find(type.GetTypeIndex());
 			if (customResolverIt != m_customTypeResolvers.end())
 			{
-				rttr::CustomTypeResolver* customTypeResolver = customResolverIt->second;
+				//rttr::CustomTypeResolver* customTypeResolver = customResolverIt->second;
 
-				// Serialized value type
-				rttr::Type serializedValueType = DeduceType(jsonVal);
-				void* serializedValue = nullptr;
+				//// Serialized value type
+				//rttr::Type serializedValueType = DeduceType(jsonVal);
+				//void* serializedValue = nullptr;
 
-				// Deserialize custom value from data source to pass to resolver
-				if (serializedValueType.GetTypeIndex() != typeid(nullptr_t))
-				{
-					serializedValue = m_context->CreateTempVariable(serializedValueType);
-					ReadImpl(serializedValueType, serializedValue, jsonVal);
-				}
+				//// Deserialize custom value from data source to pass to resolver
+				//if (serializedValueType.GetTypeIndex() != typeid(nullptr_t))
+				//{
+				//	serializedValue = m_context->CreateTempVariable(serializedValueType);
+				//	ReadImpl(serializedValueType, serializedValue, jsonVal);
+				//}
 
-				auto resolverAction = std::make_unique<detail::CustomResolverAction>(0
-					, type, value, serializedValueType, serializedValue, customTypeResolver);
-				m_deferredCommandsList.push_back(std::move(resolverAction));
+				//auto resolverAction = std::make_unique<detail::CustomResolverAction>(0
+				//	, type, value, serializedValueType, serializedValue, customTypeResolver);
+				//m_deferredCommandsList.push_back(std::move(resolverAction));
 			}
 			else
 			{
@@ -692,58 +711,6 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 bool JsonReader::IsOk() const
 {
 	return m_isOk;
-}
-
-rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
-{
-	/*switch (jsonVal.type())
-	{
-		case Json::ValueType::stringValue:
-			return rttr::Reflect<const char*>();
-		case Json::ValueType::booleanValue:
-			return rttr::Reflect<bool>();
-		case Json::ValueType::intValue:
-			return rttr::Reflect<int64_t>();
-		case Json::ValueType::uintValue:
-			return rttr::Reflect<uint64_t>();
-		case Json::ValueType::realValue:
-			return rttr::Reflect<double>();
-		case Json::ValueType::arrayValue:
-			return rttr::Reflect<nullptr_t>();
-		case Json::ValueType::objectValue:
-		{
-			if (jsonVal.isMember(k_typeId))
-			{
-				std::string typeId = jsonVal[k_typeId].asString();
-				if (typeId == k_smartptrTypeKey)
-				{
-					return rttr::Reflect(jsonVal[k_sysTypeId].asCString());
-				}
-				else
-				{
-					rttr::Type reflectedType = rttr::Reflect(typeId.c_str());
-
-					if (reflectedType.IsValid())
-					{
-						return reflectedType;
-					}
-					else
-					{
-						return rttr::Reflect<nullptr_t>();
-					}
-				}
-			}
-			else
-			{
-				return rttr::Reflect<nullptr_t>();
-			}
-		}
-		case Json::ValueType::nullValue:
-		default:
-			return rttr::Reflect<nullptr_t>();
-	}*/
-
-	return rttr::Reflect<nullptr_t>();
 }
 
 } // namespace rs
