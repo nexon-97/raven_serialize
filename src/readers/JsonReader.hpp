@@ -74,6 +74,12 @@ public:
 private:
 	ReadResult RAVEN_SERIALIZE_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
+	void ReadContextObject(const rttr::Type& type, void* value, const Json::Value& jsonVal);
+	Json::Value const* FindContextJsonObject(const Json::Value& jsonRoot, const uint64_t id) const;
+
+	// Removes data about objects that had already been loaded
+	void FilterReferencedObjectsList(std::vector<std::pair<uint64_t, rttr::Type>>& objectsList);
+
 	ReadResult ReadProxy(rttr::TypeProxyData* proxyTypeData, void* value, const Json::Value& jsonVal);
 	ReadResult ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
 	ReadResult ReadCollection(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
@@ -81,7 +87,6 @@ private:
 	ReadResult ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
 	rttr::Type DeduceType(const Json::Value& jsonVal) const;
-	std::string GetObjectClassName(const Json::Value& jsonVal) const;
 	void SortActions();
 
 private:
@@ -89,8 +94,8 @@ private:
 	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
 	std::unordered_map<std::type_index, std::unique_ptr<PredefinedJsonTypeResolver>> m_predefinedJsonTypeResolvers;
 	Json::Value m_jsonRoot;
-	void* m_currentRootObject = nullptr;
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
+	std::vector<std::pair<uint64_t, rttr::Type>> m_referencedContextObjects;
 	std::vector<std::unique_ptr<detail::IReaderAction>> m_deferredCommandsList;
 	std::vector<std::unique_ptr<rttr::CollectionInserterBase>> m_collectionInserters;
 	ContextPath m_contextPath;

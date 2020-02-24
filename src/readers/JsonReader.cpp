@@ -15,12 +15,10 @@
 namespace
 {
 const char* k_typeId = "$type$";
-const char* k_contextTypeName = "@context@";
+const char* k_contextMasterObjectKey = "$master_obj$";
 const char* k_contextObjectsKey = "$objects$";
-const char* k_smartptrTypeKey = "@smartptr@";
-const char* k_sysTypeId = "$sys_type$";
-const char* k_smartptrPointedValueKey = "ptr_value";
-const char* k_ptrMarkerKey = "$marker_id$";
+const char* k_contextIdKey = "$id$";
+const char* k_contextValKey = "$val$";
 const char* k_collectionItemsKey = "$items$";
 
 const rs::JsonReader::ReadResult k_readSuccess(true, true);
@@ -113,67 +111,123 @@ void JsonReader::SortActions()
 	std::stable_sort(m_deferredCommandsList.begin(), m_deferredCommandsList.end(), predicate);
 }
 
+Json::Value const* JsonReader::FindContextJsonObject(const Json::Value& jsonRoot, const uint64_t id) const
+{
+	for (const Json::Value& val : jsonRoot)
+	{
+		if (val.isObject() && val.isMember(k_contextIdKey) && val.isMember(k_contextValKey))
+		{
+			if (val[k_contextIdKey].asUInt64() == id)
+			{
+				return &val;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+void JsonReader::FilterReferencedObjectsList(std::vector<std::pair<uint64_t, rttr::Type>>& objectsList)
+{
+	for (auto it = objectsList.begin(); it != objectsList.end();)
+	{
+		bool objectLoaded = !!m_context->GetObjectById(it->first);
+		if (objectLoaded)
+		{
+			it = objectsList.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+}
+
+void JsonReader::ReadContextObject(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+{
+	ReadResult objectReadResult = ReadImpl(type, value, jsonVal[k_contextValKey]);
+
+	if (objectReadResult.success)
+	{
+		uint64_t objectId = (jsonVal[k_contextIdKey]).asUInt64();
+		m_context->AddObject(objectId, type, value);
+	}
+	else
+	{
+		Log::LogMessage("Failed to read context object!");
+	}
+}
+
 void JsonReader::Read(const rttr::Type& type, void* value)
 {
 	//
 	auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
 	Log::LogMessage("=========\nJsonReader [0x%llX] started reading session\n=========", readerAsInt);
 
-	std::string className = GetObjectClassName(m_jsonRoot);
 	m_context = std::make_unique<rs::detail::SerializationContext>();
 
-	if (className == k_contextTypeName)
+	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(k_contextObjectsKey) && m_jsonRoot.isMember(k_contextMasterObjectKey));
+	if (hasObjectsList)
 	{
-		// Parse context
-		const Json::Value& contextObjects = m_jsonRoot[k_contextObjectsKey];
-		std::size_t idx = 0U;
-		for (const Json::Value& contextObject : contextObjects)
+		// Parse objects list
+		const Json::Value& contextObjectsVal = m_jsonRoot[k_contextObjectsKey];
+		uint64_t masterObjectId = m_jsonRoot[k_contextMasterObjectKey].asUInt64();
+		Json::Value const* masterObjectVal = nullptr;
+
+		// Find master object json val
+		for (const Json::Value& contextObjectVal : contextObjectsVal)
 		{
-			rttr::Type objectType = DeduceType(contextObject);
-
-			if (objectType.IsValid())
+			if (contextObjectVal.isMember(k_contextIdKey) && contextObjectVal.isMember(k_contextValKey) && contextObjectVal[k_contextIdKey].asUInt64() == masterObjectId)
 			{
-				if (idx == 0U)
+				masterObjectVal = &contextObjectVal;
+				break;
+			}
+		}
+
+		if (nullptr != masterObjectVal)
+		{
+			// Parse master object
+			ReadContextObject(type, value, *masterObjectVal);
+			FilterReferencedObjectsList(m_referencedContextObjects);
+
+			while (!m_referencedContextObjects.empty())
+			{
+				// Handle referenced context objects
+				for (const auto& objectReference : m_referencedContextObjects)
 				{
-					m_currentRootObject = value;
-				}
-				else
-				{
-					m_currentRootObject = objectType.Instantiate();
-				}
-
-				//
-				auto valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
-				auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-				Log::LogMessage("JsonReader [0x%llX] started reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
-
-				ReadImpl(objectType, m_currentRootObject, contextObject);
-
-				//
-				valueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_currentRootObject));
-				readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-				Log::LogMessage("JsonReader [0x%llX] ended reading object: (%s, 0x%llX)", readerAsInt, objectType.GetName(), valueAsInt);
-
-				// Check object marker
-				if (contextObject.isObject() && contextObject.isMember(k_ptrMarkerKey))
-				{
-					std::size_t markerId = static_cast<std::size_t>(contextObject[k_ptrMarkerKey].asUInt());
-					m_context->AddObject(markerId, objectType, m_currentRootObject);
+					bool objectAlreadyLoaded = !!m_context->GetObjectById(objectReference.first);
+					if (!objectAlreadyLoaded)
+					{
+						// Find object in context
+						Json::Value const* contextJsonObjectPtr = FindContextJsonObject(contextObjectsVal, objectReference.first);
+						if (nullptr != contextJsonObjectPtr)
+						{
+							rttr::Type pointedType = objectReference.second;
+							if (pointedType.IsValid())
+							{
+								void* pointedValue = pointedType.Instantiate();
+								ReadContextObject(pointedType, pointedValue, *contextJsonObjectPtr);
+							}
+							else
+							{
+								m_context->AddObject(objectReference.first, pointedType, nullptr);
+							}
+						}
+					}
 				}
 
-				m_currentRootObject = nullptr;
-			}	
-
-			++idx;
+				FilterReferencedObjectsList(m_referencedContextObjects);
+			}
+		}
+		else
+		{
+			Log::LogMessage("Master object not found in the context objects list!");
 		}
 	}
 	else
 	{
-		m_currentRootObject = value;
-
-		ReadImpl(type, m_currentRootObject, m_jsonRoot);
-
-		m_currentRootObject = nullptr;
+		// We have single object, simply read it here
+		ReadImpl(type, value, m_jsonRoot);
 	}
 
 	// Perform actions
@@ -182,8 +236,6 @@ void JsonReader::Read(const rttr::Type& type, void* value)
 	{
 		action->Perform();
 	}
-
-	m_context->ClearTempVariables();
 
 	//
 	readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
@@ -328,14 +380,34 @@ JsonReader::ReadResult JsonReader::ReadPointer(const rttr::Type& type, void* val
 {
 	ReadResult result = k_readFailedGeneric;
 
-	//if (jsonVal.isObject() && jsonVal.isMember(k_ptrMarkerKey))
-	//{
-	//	Log::LogMessage("Type is valid pointer");
+	if (jsonVal.isNull())
+	{
+		// Resolve null pointer
+		rttr::AssignPointerValue(value, nullptr);
+		result = k_readSuccess;
+	}
+	else if (jsonVal.isUInt())
+	{
+		uint64_t objectId = jsonVal.asUInt64();
+		m_referencedContextObjects.emplace_back(objectId, type.GetPointedType());
 
-	//	std::size_t markerId = static_cast<std::size_t>(jsonVal[k_ptrMarkerKey].asUInt());
-	//	auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), type, value, markerId);
-	//	m_deferredCommandsList.push_back(std::move(resolvePtrAction));
-	//}
+		result = k_readSuccess;
+
+		// If we have resolved pointer address right now, use it
+		auto referencedObjectData = m_context->GetObjectById(objectId);
+		if (nullptr != referencedObjectData)
+		{
+			rttr::AssignPointerValue(value, referencedObjectData->objectPtr);
+		}
+		else
+		{
+			// Pointer can't be resolved right now, so put resolve action into deferred commands list
+			auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), value, objectId);
+			m_deferredCommandsList.push_back(std::move(resolvePtrAction));
+
+			result.allEntitiesResolved = false;
+		}
+	}
 
 	return result;
 }
@@ -474,23 +546,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 					break;
 					case rttr::TypeClass::Pointer:
 					{
-						ReadResult pointerReadResult = ReadPointer(type, value, jsonVal);
-					
-						// If we have read valid pointer, we notify calling code, that in the read chain there is a pointer that must be resolved later
-						if (pointerReadResult.Succeeded())
-						{
-							result.success = true;
-							result.allEntitiesResolved = false;
-						}
-						else
-						{
-							// If we failed to obtain the pointer description, we mark pointer as nullptr immediately and return not success
-							uintptr_t* ptrValue = static_cast<uintptr_t*>(value);
-							*ptrValue = 0;
-
-							result.success = false;
-							result.allEntitiesResolved = true;
-						}
+						result = ReadPointer(type, value, jsonVal);
 					}
 					break;
 					case rttr::TypeClass::Enum:
@@ -622,19 +678,9 @@ void JsonReader::AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeR
 	m_customTypeResolvers.emplace(type.GetTypeIndex(), resolver);
 }
 
-std::string JsonReader::GetObjectClassName(const Json::Value& jsonVal) const
-{
-	if (jsonVal.isObject() && jsonVal.isMember(k_typeId))
-	{
-		return jsonVal[k_typeId].asString();
-	}
-
-	return std::string();
-}
-
 rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
 {
-	switch (jsonVal.type())
+	/*switch (jsonVal.type())
 	{
 		case Json::ValueType::stringValue:
 			return rttr::Reflect<const char*>();
@@ -679,7 +725,9 @@ rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const
 		case Json::ValueType::nullValue:
 		default:
 			return rttr::Reflect<nullptr_t>();
-	}
+	}*/
+
+	return rttr::Reflect<nullptr_t>();
 }
 
 } // namespace rs

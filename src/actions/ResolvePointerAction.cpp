@@ -1,6 +1,7 @@
 #include "actions/ResolvePointerAction.hpp"
 #include "SerializationContext.hpp"
 #include "rs/log/Log.hpp"
+#include "rttr/Manager.hpp"
 
 namespace rs
 {
@@ -8,30 +9,28 @@ namespace detail
 {
 
 ResolvePointerAction::ResolvePointerAction(const std::size_t depth, SerializationContext* context
-	, const rttr::Type& pointerType, void* pointerAddress, const std::size_t markerId)
+	, void* pointerAddress, const uint64_t objectId)
 	: IReaderAction(depth)
 	, m_context(context)
-	, m_pointerType(pointerType)
 	, m_pointerAddress(pointerAddress)
-	, m_markerId(markerId)
+	, m_objectId(objectId)
 {}
 
 void ResolvePointerAction::Perform()
 {
 	auto pointerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_pointerAddress));
 
-	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_markerId);
+	const SerializationContext::ObjectData* objectData = m_context->GetObjectById(m_objectId);
 	if (nullptr != objectData)
 	{
 		auto pointerValueAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(objectData->objectPtr));
 		Log::LogMessage("ResolvePointerAction performed. Pointer at 0x%llX filled with address 0x%llX", pointerAsInt, pointerValueAsInt);
-
-		//m_pointerType.AssignPointerValue(m_pointerAddress, const_cast<void*>(objectData->objectPtr));
+		rttr::AssignPointerValue(m_pointerAddress, objectData->objectPtr);
 	}
 	else
 	{
 		Log::LogMessage("ResolvePointerAction performed. Pointer at 0x%llX filled with address null", pointerAsInt);
-		//m_pointerType.AssignPointerValue(m_pointerAddress, nullptr);
+		rttr::AssignPointerValue(m_pointerAddress, nullptr);
 	}
 }
 

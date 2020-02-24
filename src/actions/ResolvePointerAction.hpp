@@ -13,17 +13,15 @@ class ResolvePointerAction
 	: public IReaderAction
 {
 public:
-	explicit ResolvePointerAction(const std::size_t depth, SerializationContext* context
-		, const rttr::Type& pointerType, void* pointerAddress, const std::size_t markerId);
+	explicit ResolvePointerAction(const std::size_t depth, SerializationContext* context, void* pointerAddress, const uint64_t objectId);
 
 	void Perform() final;
 	const ReaderActionType GetActionType() const final;
 
 private:
 	SerializationContext* m_context;
-	rttr::Type m_pointerType;
 	void* m_pointerAddress;
-	std::size_t m_markerId;
+	uint64_t m_objectId;
 };
 
 } // namespace detail

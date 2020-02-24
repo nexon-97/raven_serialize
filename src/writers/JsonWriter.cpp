@@ -328,15 +328,15 @@ void JsonWriter::GenerateSerializationContextValues()
 		return;
 
 	m_serializedObjects.clear();
-	for (const auto& contextValue : m_context->GetObjects())
-	{
-		WriteObject(contextValue.type, contextValue.objectPtr);
-		Json::Value& objectJsonValue = *m_jsonStack.top();
-		objectJsonValue[k_ptrMarkerKey] = contextValue.objectId;
-		m_jsonStack.pop();
+	//for (const auto& contextValue : m_context->GetObjects())
+	//{
+	//	WriteObject(contextValue.type, contextValue.objectPtr);
+	//	Json::Value& objectJsonValue = *m_jsonStack.top();
+	//	objectJsonValue[k_ptrMarkerKey] = contextValue.objectId;
+	//	m_jsonStack.pop();
 
-		m_serializedObjects.push_back(std::move(objectJsonValue));
-	}
+	//	m_serializedObjects.push_back(std::move(objectJsonValue));
+	//}
 }
 
 Json::Value& JsonWriter::CreateJsonObject(const Json::ValueType valueType)

@@ -6,61 +6,30 @@ namespace rs
 namespace detail
 {
 
-SerializationContext::ObjectData::ObjectData(const rttr::Type& type, const void* objectPtr, const std::size_t objectId) noexcept
+SerializationContext::ObjectData::ObjectData(const rttr::Type& type, void* objectPtr) noexcept
 	: type(type)
 	, objectPtr(objectPtr)
-	, objectId(objectId)
 {}
 
-std::size_t SerializationContext::AddObject(const rttr::Type& type, const void* objectPtr)
+SerializationContext::~SerializationContext()
 {
-	auto predicate = [&type, objectPtr](const ObjectData& data)
-	{
-		return data.objectPtr == objectPtr && data.type == type;
-	};
-
-	// Find the same object in context
-	auto it = std::find_if(m_objects.begin(), m_objects.end(), predicate);
-	if (it == m_objects.end())
-	{
-		// Object not found, create new entry
-		std::size_t objectId = m_objects.size();
-		m_objects.emplace_back(type, objectPtr, objectId);
-
-		return objectId;
-	}
-	else
-	{
-		// Object found, return its id
-		return it->objectId;
-	}
+	ClearTempVariables();
 }
 
-void SerializationContext::AddObject(const std::size_t idx, const rttr::Type& type, const void* objectPtr)
+void SerializationContext::AddObject(const uint64_t idx, const rttr::Type& type, void* objectPtr)
 {
-	m_objects.emplace_back(type, objectPtr, idx);
+	m_objects.emplace(std::piecewise_construct, std::forward_as_tuple(idx), std::forward_as_tuple(type, objectPtr));
 }
 
-const SerializationContext::ObjectData* SerializationContext::GetObjectById(const std::size_t id) const
+SerializationContext::ObjectData const* SerializationContext::GetObjectById(const uint64_t id) const
 {
-	auto predicate = [id](const ObjectData& data)
-	{
-		return data.objectId == id;
-	};
-
-	auto it = std::find_if(m_objects.begin(), m_objects.end(), predicate);
+	auto it = m_objects.find(id);
 	if (it != m_objects.end())
 	{
-		const SerializationContext::ObjectData& data = *it;
-		return &data;
+		return &it->second;
 	}
 
 	return nullptr;
-}
-
-const std::vector<SerializationContext::ObjectData>& SerializationContext::GetObjects() const
-{
-	return m_objects;
 }
 
 void* SerializationContext::CreateTempVariable(const rttr::Type& type)

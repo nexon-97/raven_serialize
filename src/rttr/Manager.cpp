@@ -11,6 +11,12 @@ void InitRavenSerialization()
 	MetaType<rs::detail::SerializationContext>("@context@");
 }
 
+void AssignPointerValue(void* pointerAddress, void* value)
+{
+	uintptr_t** pointerValue = reinterpret_cast<uintptr_t**>(pointerAddress);
+	*pointerValue = static_cast<uintptr_t*>(value);
+}
+
 Manager& Manager::GetRTTRManager()
 {
 	static Manager s_manager;	

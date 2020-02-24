@@ -74,6 +74,9 @@ struct DefaultInstanceDestructor<T[N]>
 	}
 };
 
+// Helper function for pointers assignment
+void RAVEN_SERIALIZE_API AssignPointerValue(void* pointerAddress, void* value);
+
 ///////////////////////////////////////////////////////////////////////////////////////
 
 template <typename T>

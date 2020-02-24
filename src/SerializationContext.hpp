@@ -13,28 +13,26 @@ namespace detail
 class SerializationContext
 {
 public:
-	SerializationContext() = default;
+	SerializationContext() = default; 
+	~SerializationContext();
 
 	struct ObjectData
 	{
 		rttr::Type type;
-		const void* objectPtr;
-		std::size_t objectId;
+		void* objectPtr;
 
-		RAVEN_SERIALIZE_API ObjectData(const rttr::Type& type, const void* objectPtr, const std::size_t objectId) noexcept;
+		RAVEN_SERIALIZE_API ObjectData(const rttr::Type& type, void* objectPtr) noexcept;
 	};
 
-	std::size_t RAVEN_SERIALIZE_API AddObject(const rttr::Type& type, const void* objectPtr);
-	void RAVEN_SERIALIZE_API AddObject(const std::size_t idx, const rttr::Type& type, const void* objectPtr);
-	RAVEN_SERIALIZE_API const ObjectData* GetObjectById(const std::size_t id) const;
-	RAVEN_SERIALIZE_API const std::vector<ObjectData>& GetObjects() const;
+	void RAVEN_SERIALIZE_API AddObject(const uint64_t idx, const rttr::Type& type, void* objectPtr);
+	RAVEN_SERIALIZE_API ObjectData const* GetObjectById(const uint64_t id) const;
 
 	RAVEN_SERIALIZE_API void* CreateTempVariable(const rttr::Type& type);
 	void RAVEN_SERIALIZE_API DestroyTempVariable(void* ptr);
 	void RAVEN_SERIALIZE_API ClearTempVariables();
 
 private:
-	std::vector<ObjectData> m_objects;
+	std::unordered_map<uint64_t, ObjectData> m_objects;
 	std::unordered_map<void*, rttr::Type> m_tempVariables;
 };
 
