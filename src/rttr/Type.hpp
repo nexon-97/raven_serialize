@@ -96,6 +96,7 @@ public:
 	std::size_t RAVEN_SERIALIZE_API GetHash() const;
 
 	const bool RAVEN_SERIALIZE_API IsValid() const;
+	RAVEN_SERIALIZE_API operator bool() const;
 
 	// Constructor and destructor
 	RAVEN_SERIALIZE_API void* Instantiate() const;

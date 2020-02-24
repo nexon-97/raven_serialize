@@ -47,6 +47,7 @@ private:
 	ReadResult ReadProxy(rttr::TypeProxyData* proxyTypeData, void* value, const Json::Value& jsonVal);
 	ReadResult ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
 	ReadResult ReadCollection(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
+	ReadResult ReadObjectBases(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	ReadResult ReadPointer(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	ReadResult ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 

@@ -47,6 +47,11 @@ const bool Type::IsValid() const
 	return nullptr != m_typeData;
 }
 
+Type::operator bool() const
+{
+	return IsValid();
+}
+
 const char* Type::GetName() const
 {
 	if (m_typeData)

@@ -33,4 +33,14 @@ const char* SerializationKeywords::CollectionItems()
 	return "$items$";
 }
 
+const char* SerializationKeywords::Bases()
+{
+	return "$bases$";
+}
+
+const char* SerializationKeywords::BaseId()
+{
+	return "$base$";
+}
+
 }

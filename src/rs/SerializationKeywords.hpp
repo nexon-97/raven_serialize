@@ -12,6 +12,8 @@ public:
 	static const char* ContextObjectId();
 	static const char* ContextObjectVal();
 	static const char* CollectionItems();
+	static const char* Bases();
+	static const char* BaseId();
 };
 
 }
@@ -22,3 +24,5 @@ public:
 #define K_CONTEXT_OBJ_ID rs::SerializationKeywords::ContextObjectId()
 #define K_CONTEXT_OBJ_VAL rs::SerializationKeywords::ContextObjectVal()
 #define K_COLLECTION_ITEMS rs::SerializationKeywords::CollectionItems()
+#define K_BASES rs::SerializationKeywords::Bases()
+#define K_BASE_ID rs::SerializationKeywords::BaseId()

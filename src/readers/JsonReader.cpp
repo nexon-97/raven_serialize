@@ -231,6 +231,40 @@ bool JsonReader::CheckSourceHasObjectsList()
 	return hasObjectsList;
 }
 
+ReadResult JsonReader::ReadObjectBases(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+{
+	ReadResult result = ReadResult::OKResult();
+
+	const auto& baseClassesInfo = type.GetBaseClasses();
+	if (baseClassesInfo.second > 0U && jsonVal.isMember(K_BASES))
+	{
+		for (uint8_t i = 0U; i < baseClassesInfo.second; ++i)
+		{
+			bool baseClassResolved = false;
+			rttr::Type baseClass = baseClassesInfo.first[i];
+
+			for (const Json::Value& baseVal : jsonVal[K_BASES])
+			{
+				if (baseVal.isMember(K_BASE_ID) && baseVal[K_BASE_ID].asString() == baseClass.GetName())
+				{
+					ReadResult baseReadResult = ReadImpl(baseClass, value, baseVal);
+					result.Merge(baseReadResult);
+
+					baseClassResolved = true;
+					break;
+				}
+			}
+
+			if (!baseClassResolved)
+			{
+				Log::LogMessage("Base class '%s' not resolved!", baseClass.GetName());
+			}
+		}
+	}
+
+	return result;
+}
+
 ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
 {
 	ReadResult result = ReadResult::OKResult(); // If we have no properties, it's OK
@@ -487,7 +521,6 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 		rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
 		if (nullptr != proxyTypeData)
 		{
-			Log::LogMessage("Type '%s' is read as proxy type '%s'", type.GetName(), proxyTypeData->proxyType.GetName());
 			result = ReadProxy(proxyTypeData, value, jsonVal);
 		}
 		else
@@ -521,13 +554,15 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 					{
 						result = ReadResult::OKResult();
 
+						ReadResult basesReadResult = ReadObjectBases(type, value, jsonVal);
+						result.Merge(basesReadResult);
+
 						std::size_t propertiesCount = type.GetPropertiesCount();
 						ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
 						result.Merge(propertiesReadResult);
 
 						if (type.IsCollection())
 						{
-							Log::LogMessage("Type '%s' is collection", type.GetName());
 							ReadResult collectionReadResult = ReadCollection(type, value, jsonVal, propertiesCount);
 							result.Merge(collectionReadResult);
 						}
@@ -541,7 +576,6 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 					case rttr::TypeClass::Enum:
 					{
 						rttr::Type enumUnderlyingType = type.GetEnumUnderlyingType();
-						Log::LogMessage("Type is enum. Underlying type: '%s'", enumUnderlyingType.GetName());
 						result = ReadImpl(enumUnderlyingType, value, jsonVal);
 					}
 					break;
@@ -596,7 +630,6 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 							if (type.IsSignedIntegral())
 							{
 								int64_t intValue = jsonVal.asInt64();
-								Log::LogMessage("Type is int. Value: %lld", intValue);
 
 								switch (type.GetSize())
 								{
@@ -620,7 +653,6 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 							else
 							{
 								uint64_t intValue = jsonVal.asUInt64();
-								Log::LogMessage("Type is uint. Value: %llu", intValue);
 
 								switch (type.GetSize())
 								{
