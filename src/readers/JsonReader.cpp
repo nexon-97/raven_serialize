@@ -14,6 +14,8 @@
 
 namespace
 {
+
+// Reserved serialization keywords
 const char* k_typeId = "$type$";
 const char* k_contextMasterObjectKey = "$master_obj$";
 const char* k_contextObjectsKey = "$objects$";
@@ -21,11 +23,16 @@ const char* k_contextIdKey = "$id$";
 const char* k_contextValKey = "$val$";
 const char* k_collectionItemsKey = "$items$";
 
-const rs::JsonReader::ReadResult k_readSuccess(true, true);
-const rs::JsonReader::ReadResult k_readFailedGeneric(false, true);
+//////////////////////////////////////////////////////////////////////////////////
+// Predefined Json type resolvers implementation
+
+struct PredefinedJsonTypeResolver
+{
+	virtual void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) = 0;
+};
 
 struct StdStringJsonTypeResolver
-	: rs::JsonReader::PredefinedJsonTypeResolver
+	: PredefinedJsonTypeResolver
 {
 	void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) override
 	{
@@ -41,7 +48,7 @@ struct StdStringJsonTypeResolver
 };
 
 struct ConstCharStringJsonTypeResolver
-	: rs::JsonReader::PredefinedJsonTypeResolver
+	: PredefinedJsonTypeResolver
 {
 	void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) override
 	{
@@ -59,39 +66,57 @@ struct ConstCharStringJsonTypeResolver
 	}
 };
 
+std::unordered_map<std::type_index, std::unique_ptr<PredefinedJsonTypeResolver>> g_predefinedJsonTypeResolvers;
+
+struct JsonTypeResolversInitContext
+{
+	JsonTypeResolversInitContext()
+	{
+		// Register predefined types resolvers
+		g_predefinedJsonTypeResolvers.emplace(typeid(std::string), std::make_unique<StdStringJsonTypeResolver>());
+		//m_predefinedJsonTypeResolvers.emplace(typeid(std::wstring), std::make_unique<StdStringJsonTypeResolver<std::wstring>>());
+		g_predefinedJsonTypeResolvers.emplace(typeid(const char*), std::make_unique<ConstCharStringJsonTypeResolver>());
+	}
+};
+
+const JsonTypeResolversInitContext typeResolversInitContext;
+
 }
 
 namespace rs
 {
 
 JsonReader::JsonReader(std::istream& stream)
-	: m_stream(stream)
 {
 	std::size_t startOffset = stream.tellg();
-	m_stream.seekg(0, std::ios::end);
-	std::size_t bufferSize = static_cast<std::size_t>(m_stream.tellg()) - startOffset;
-	m_stream.seekg(startOffset, std::ios::beg);
 
-	char* buffer = new char[bufferSize];
-	m_stream.read(buffer, bufferSize);
+	stream.seekg(0, std::ios::end);
+	std::size_t bufferSize = static_cast<std::size_t>(stream.tellg()) - startOffset;
+	stream.seekg(startOffset, std::ios::beg);
 
-	Json::CharReaderBuilder builder;
-	auto reader = builder.newCharReader();
-	std::string errorStr;
+	if (bufferSize > 0U)
+	{
+		char* buffer = new char[bufferSize];
+		stream.read(buffer, bufferSize);
 
-	m_isOk = reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr);
+		Json::CharReaderBuilder builder;
+		auto reader = builder.newCharReader();
+		std::string errorStr;
+
+		m_isOk = reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr);
+
+		delete[] buffer;
+	}
+	else
+	{
+		m_isOk = false;
+	}
 
 	if (!m_isOk)
 	{
-		m_stream.seekg(startOffset, std::ios::beg);
+		// Revert stream back to original offset
+		stream.seekg(startOffset, std::ios::beg);
 	}
-
-	delete[] buffer;
-
-	// Register predefined types resolvers
-	m_predefinedJsonTypeResolvers.emplace(typeid(std::string), std::make_unique<StdStringJsonTypeResolver>());
-	//m_predefinedJsonTypeResolvers.emplace(typeid(std::wstring), std::make_unique<StdStringJsonTypeResolver<std::wstring>>());
-	m_predefinedJsonTypeResolvers.emplace(typeid(const char*), std::make_unique<ConstCharStringJsonTypeResolver>());
 }
 
 void JsonReader::SortActions()
@@ -127,22 +152,6 @@ Json::Value const* JsonReader::FindContextJsonObject(const Json::Value& jsonRoot
 	return nullptr;
 }
 
-void JsonReader::FilterReferencedObjectsList(std::vector<std::pair<uint64_t, rttr::Type>>& objectsList)
-{
-	for (auto it = objectsList.begin(); it != objectsList.end();)
-	{
-		bool objectLoaded = !!m_context->GetObjectById(it->first);
-		if (objectLoaded)
-		{
-			it = objectsList.erase(it);
-		}
-		else
-		{
-			++it;
-		}
-	}
-}
-
 void JsonReader::ReadContextObject(const rttr::Type& type, void* value, const Json::Value& jsonVal)
 {
 	ReadResult objectReadResult = ReadImpl(type, value, jsonVal[k_contextValKey]);
@@ -158,14 +167,8 @@ void JsonReader::ReadContextObject(const rttr::Type& type, void* value, const Js
 	}
 }
 
-void JsonReader::Read(const rttr::Type& type, void* value)
+void JsonReader::DoRead(const rttr::Type& type, void* value)
 {
-	//
-	auto readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-	Log::LogMessage("=========\nJsonReader [0x%llX] started reading session\n=========", readerAsInt);
-
-	m_context = std::make_unique<rs::detail::SerializationContext>();
-
 	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(k_contextObjectsKey) && m_jsonRoot.isMember(k_contextMasterObjectKey));
 	if (hasObjectsList)
 	{
@@ -229,22 +232,17 @@ void JsonReader::Read(const rttr::Type& type, void* value)
 		// We have single object, simply read it here
 		ReadImpl(type, value, m_jsonRoot);
 	}
-
-	// Perform actions
-	//SortActions();
-	for (const auto& action : m_deferredCommandsList)
-	{
-		action->Perform();
-	}
-
-	//
-	readerAsInt = static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(this));
-	Log::LogMessage("=========\nJsonReader [0x%llX] ended reading session\n=========", readerAsInt);
 }
 
-JsonReader::ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
+bool JsonReader::CheckSourceHasObjectsList()
 {
-	ReadResult result = k_readSuccess; // If we have no properties, it's OK
+	bool hasObjectsList = (m_jsonRoot.isObject() && m_jsonRoot.isMember(k_contextObjectsKey) && m_jsonRoot.isMember(k_contextMasterObjectKey));
+	return hasObjectsList;
+}
+
+ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
+{
+	ReadResult result = ReadResult::OKResult(); // If we have no properties, it's OK
 
 	for (std::size_t i = 0U; i < propertiesCount; ++i)
 	{
@@ -287,7 +285,7 @@ JsonReader::ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, 
 				if (!propertyReadResult.allEntitiesResolved)
 				{
 					// If not all property value entities are resolved, make use of deferred commands list
-					auto callMutatorAction = std::make_unique<detail::CallObjectMutatorAction>(m_contextPath.GetSize(), property, value, propertyValuePtr);
+					auto callMutatorAction = std::make_unique<detail::CallObjectMutatorAction>(0, property, value, propertyValuePtr);
 					m_deferredCommandsList.push_back(std::move(callMutatorAction));
 
 					// Notify calling code that not all entities are resolved for this object
@@ -305,9 +303,9 @@ JsonReader::ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, 
 	return result;
 }
 
-JsonReader::ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
+ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount)
 {
-	JsonReader::ReadResult result = k_readFailedGeneric;
+	ReadResult result = ReadResult::GenericFailResult();
 
 	// Pick correct json value to get objects from
 	Json::Value const* collectionItemsVal = nullptr;
@@ -361,7 +359,7 @@ JsonReader::ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* 
 						result.allEntitiesResolved = false;
 
 						// Not all entities of collection item are resolved, put insert command to deferred commands list
-						auto insertAction = std::make_unique<detail::CollectionInsertAction>(m_contextPath.GetSize(), rawInserter, collectionItem);
+						auto insertAction = std::make_unique<detail::CollectionInsertAction>(0, rawInserter, collectionItem);
 						m_deferredCommandsList.push_back(std::move(insertAction));
 					}
 					
@@ -376,22 +374,22 @@ JsonReader::ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* 
 	return result;
 }
 
-JsonReader::ReadResult JsonReader::ReadPointer(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+ReadResult JsonReader::ReadPointer(const rttr::Type& type, void* value, const Json::Value& jsonVal)
 {
-	ReadResult result = k_readFailedGeneric;
+	ReadResult result = ReadResult::GenericFailResult();
 
 	if (jsonVal.isNull())
 	{
 		// Resolve null pointer
 		rttr::AssignPointerValue(value, nullptr);
-		result = k_readSuccess;
+		result = ReadResult::OKResult();
 	}
 	else if (jsonVal.isUInt())
 	{
 		uint64_t objectId = jsonVal.asUInt64();
 		m_referencedContextObjects.emplace_back(objectId, type.GetPointedType());
 
-		result = k_readSuccess;
+		result = ReadResult::OKResult();
 
 		// If we have resolved pointer address right now, use it
 		auto referencedObjectData = m_context->GetObjectById(objectId);
@@ -402,7 +400,7 @@ JsonReader::ReadResult JsonReader::ReadPointer(const rttr::Type& type, void* val
 		else
 		{
 			// Pointer can't be resolved right now, so put resolve action into deferred commands list
-			auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(m_contextPath.GetSize(), m_context.get(), value, objectId);
+			auto resolvePtrAction = std::make_unique<detail::ResolvePointerAction>(0, m_context.get(), value, objectId);
 			m_deferredCommandsList.push_back(std::move(resolvePtrAction));
 
 			result.allEntitiesResolved = false;
@@ -412,9 +410,9 @@ JsonReader::ReadResult JsonReader::ReadPointer(const rttr::Type& type, void* val
 	return result;
 }
 
-JsonReader::ReadResult JsonReader::ReadProxy(rttr::TypeProxyData* proxyTypeData, void* value, const Json::Value& jsonVal)
+ReadResult JsonReader::ReadProxy(rttr::TypeProxyData* proxyTypeData, void* value, const Json::Value& jsonVal)
 {
-	ReadResult result = k_readFailedGeneric;
+	ReadResult result = ReadResult::GenericFailResult();
 
 	if (proxyTypeData->readConverter)
 	{
@@ -435,13 +433,13 @@ JsonReader::ReadResult JsonReader::ReadProxy(rttr::TypeProxyData* proxyTypeData,
 	return result;
 }
 
-JsonReader::ReadResult JsonReader::ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+ReadResult JsonReader::ReadArray(const rttr::Type& type, void* value, const Json::Value& jsonVal)
 {
-	ReadResult result = k_readFailedGeneric;
+	ReadResult result = ReadResult::GenericFailResult();
 
 	if (jsonVal.isArray())
 	{
-		result = k_readSuccess;
+		result = ReadResult::OKResult();
 
 		rttr::Type arrayType = type.GetArrayType();
 		uint8_t* arrayBytePtr = static_cast<uint8_t*>(value);
@@ -480,18 +478,18 @@ JsonReader::ReadResult JsonReader::ReadArray(const rttr::Type& type, void* value
 	return result;
 }
 
-JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
+ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal)
 {
 	assert(m_isOk);
 
-	ReadResult result = k_readFailedGeneric;
+	ReadResult result = ReadResult::GenericFailResult();
 
 	// Find in predefined types list
-	auto predefinedTypeIt = m_predefinedJsonTypeResolvers.find(type.GetTypeIndex());
-	if (predefinedTypeIt != m_predefinedJsonTypeResolvers.end())
+	auto predefinedTypeIt = g_predefinedJsonTypeResolvers.find(type.GetTypeIndex());
+	if (predefinedTypeIt != g_predefinedJsonTypeResolvers.end())
 	{
 		predefinedTypeIt->second->Read(type, value, jsonVal);
-		result = k_readSuccess; // Check errors from predefined types
+		result = ReadResult::OKResult(); // Check errors from predefined types
 	}
 	else
 	{
@@ -520,7 +518,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 					ReadImpl(serializedValueType, serializedValue, jsonVal);
 				}
 
-				auto resolverAction = std::make_unique<detail::CustomResolverAction>(m_contextPath.GetSize()
+				auto resolverAction = std::make_unique<detail::CustomResolverAction>(0
 					, type, value, serializedValueType, serializedValue, customTypeResolver);
 				m_deferredCommandsList.push_back(std::move(resolverAction));
 			}
@@ -530,7 +528,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 				{
 					case rttr::TypeClass::Object:
 					{
-						result = k_readSuccess;
+						result = ReadResult::OKResult();
 
 						std::size_t propertiesCount = type.GetPropertiesCount();
 						ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
@@ -563,11 +561,11 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 						if (jsonVal.isNumeric())
 						{
 							valueToAssign = jsonVal.asDouble();
-							result = k_readSuccess;
+							result = ReadResult::OKResult();
 						}
 						else
 						{
-							result = k_readFailedGeneric;
+							result = ReadResult::GenericFailResult();
 						}
 
 						if (type.GetTypeIndex() == typeid(float))
@@ -589,7 +587,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 								case Json::booleanValue:
 									{
 										*static_cast<bool*>(value) = jsonVal.asBool();
-										result = k_readSuccess;
+										result = ReadResult::OKResult();
 									}
 									break;
 								case Json::intValue:
@@ -597,7 +595,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 								case Json::nullValue:
 									{
 										*static_cast<bool*>(value) = !!jsonVal.asUInt64();
-										result = k_readSuccess;
+										result = ReadResult::OKResult();
 									}
 									break;
 							}
@@ -626,7 +624,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 									break;
 								}
 
-								result = k_readSuccess;
+								result = ReadResult::OKResult();
 							}
 							else
 							{
@@ -650,7 +648,7 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 									break;
 								}
 
-								result = k_readSuccess;
+								result = ReadResult::OKResult();
 							}
 						}
 					}
@@ -671,11 +669,6 @@ JsonReader::ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value,
 bool JsonReader::IsOk() const
 {
 	return m_isOk;
-}
-
-void JsonReader::AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver)
-{
-	m_customTypeResolvers.emplace(type.GetTypeIndex(), resolver);
 }
 
 rttr::Type JsonReader::DeduceType(const Json::Value& jsonVal) const

@@ -1,5 +1,5 @@
 #pragma once
-#include "readers/IReader.hpp"
+#include "readers/BaseReader.hpp"
 #include "rttr/Type.hpp"
 #include "rttr/CustomTypeResolver.hpp"
 #include "actions/IReaderAction.hpp"
@@ -20,65 +20,29 @@ namespace rs
 {
 
 class JsonReader
-	: public IReader
+	: public BaseReader
 {
 public:
 	explicit RAVEN_SERIALIZE_API JsonReader(std::istream& stream);
 	RAVEN_SERIALIZE_API ~JsonReader() = default;
 
-	struct ReadResult
-	{
-		bool success = true;
-		bool allEntitiesResolved = true;
-
-		ReadResult(bool success, bool allEntitiesResolved)
-			: success(success)
-			, allEntitiesResolved(allEntitiesResolved)
-		{}
-
-		bool Succeeded() const
-		{
-			return success && allEntitiesResolved;
-		}
-
-		void Merge(const ReadResult& other)
-		{
-			if (other.success != success)
-			{
-				success = false;
-			}
-
-			if (other.allEntitiesResolved != allEntitiesResolved)
-			{
-				allEntitiesResolved = false;
-			}
-		}
-	};
-
 	template <typename T>
 	void Read(T& value)
 	{
-		Read(rttr::Reflect<T>(), &value);
+		BaseReader::Read(rttr::Reflect<T>(), &value);
 	}
 
-	void RAVEN_SERIALIZE_API Read(const rttr::Type& type, void* value) final;
 	bool RAVEN_SERIALIZE_API IsOk() const final;
 
-	void RAVEN_SERIALIZE_API AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver) final;
-
-	struct PredefinedJsonTypeResolver
-	{
-		virtual void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) = 0;
-	};
+protected:
+	void DoRead(const rttr::Type& type, void* value) final;
+	bool CheckSourceHasObjectsList() final;
 
 private:
-	ReadResult RAVEN_SERIALIZE_API ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
+	ReadResult ReadImpl(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 
 	void ReadContextObject(const rttr::Type& type, void* value, const Json::Value& jsonVal);
 	Json::Value const* FindContextJsonObject(const Json::Value& jsonRoot, const uint64_t id) const;
-
-	// Removes data about objects that had already been loaded
-	void FilterReferencedObjectsList(std::vector<std::pair<uint64_t, rttr::Type>>& objectsList);
 
 	ReadResult ReadProxy(rttr::TypeProxyData* proxyTypeData, void* value, const Json::Value& jsonVal);
 	ReadResult ReadObjectProperties(const rttr::Type& type, void* value, const Json::Value& jsonVal, std::size_t propertiesCount);
@@ -90,16 +54,9 @@ private:
 	void SortActions();
 
 private:
-	std::istream& m_stream;
-	std::unordered_map<std::type_index, rttr::CustomTypeResolver*> m_customTypeResolvers;
-	std::unordered_map<std::type_index, std::unique_ptr<PredefinedJsonTypeResolver>> m_predefinedJsonTypeResolvers;
 	Json::Value m_jsonRoot;
-	std::unique_ptr<rs::detail::SerializationContext> m_context;
-	std::vector<std::pair<uint64_t, rttr::Type>> m_referencedContextObjects;
-	std::vector<std::unique_ptr<detail::IReaderAction>> m_deferredCommandsList;
-	std::vector<std::unique_ptr<rttr::CollectionInserterBase>> m_collectionInserters;
-	ContextPath m_contextPath;
 	bool m_isOk = false;
+	bool m_isReading = false;
 };
 
 } // namespace rs
