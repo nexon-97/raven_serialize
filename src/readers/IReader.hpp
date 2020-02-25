@@ -1,6 +1,5 @@
 #pragma once
 #include "rttr/Type.hpp"
-#include "rttr/CustomTypeResolver.hpp"
 #include "readers/ReadResult.hpp"
 
 #include <unordered_map>

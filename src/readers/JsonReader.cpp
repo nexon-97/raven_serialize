@@ -1,11 +1,9 @@
 #include "readers/JsonReader.hpp"
 #include "rttr/Property.hpp"
-#include "rttr/CustomTypeResolver.hpp"
 #include "rttr/Manager.hpp"
 #include "rs/SerializationKeywords.hpp"
 #include "actions/CallObjectMutatorAction.hpp"
 #include "actions/ResolvePointerAction.hpp"
-#include "actions/CustomResolverAction.hpp"
 #include "actions/CollectionInsertAction.hpp"
 
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
@@ -552,13 +550,14 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 				SerializationAdapter::DataChunk payload;
 				payload.type = adapter->GetPayloadType();
 
-				if (payload.type.IsValid() && jsonVal.isMember(K_ADAPTER))
+				if (payload.type.IsValid() && jsonVal.isObject() && jsonVal.isMember(K_ADAPTER))
 				{
+					// If it's a json object with adapter member, treat it as payload
 					payload.value = m_context->CreateTempVariable(payload.type);
 					ReadResult payloadReadResult = ReadImpl(payload.type, payload.value, jsonVal[K_ADAPTER]);
 				}
 
-				// Perform adapter logic
+				// Perform adapter logic (payload can be empty)
 				SerializationAdapter::AdapterReadOutput adapterOutput = adapter->ReadConvert(payload);
 
 				// Read json value as converted type

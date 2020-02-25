@@ -1,7 +1,6 @@
 #pragma once
 #include "readers/IReader.hpp"
 #include "rttr/Type.hpp"
-#include "rttr/CustomTypeResolver.hpp"
 #include "actions/IReaderAction.hpp"
 #include "SerializationContext.hpp"
 #include "ContextPath.hpp"

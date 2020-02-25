@@ -265,11 +265,6 @@ std::string JsonWriter::WStringToUtf8(const wchar_t* _literal)
 	return utf8String;
 }
 
-void JsonWriter::AddCustomTypeResolver(const rttr::Type& type, rttr::CustomTypeResolver* resolver)
-{
-	m_customTypeResolvers.emplace(type.GetTypeIndex(), resolver);
-}
-
 void JsonWriter::CreateSerializationContext()
 {
 	if (nullptr == m_context)
