@@ -45,8 +45,8 @@ public:
 		static_assert(!std::is_same_v<T, U>, "Proxy type can't be the same as type!");
 		static_assert(std::is_constructible_v<T, U>, "Type must have constructor taking proxy object type to work!");
 
-		// Check if current type doesn't have proxy, as multiple proxies are not allowed
-		assert(nullptr == m_generatedType.GetProxyType());
+		// Check if current type doesn't have any custom serialization logic yet
+		assert(m_generatedType.GetSerializationMethod() == rs::SerializationMethod::Default);
 
 		Type proxyType = Reflect<U>();
 		m_generatedType.RegisterProxy(proxyType);
@@ -137,8 +137,8 @@ public:
 	{
 		static_assert(std::is_base_of_v<rs::SerializationAdapter, AdapterT>, "Adapter type is not based on rs::SerializationAdapter!");
 
-		// Check if current type doesn't have proxy, as multiple proxies are not allowed
-		assert(nullptr == m_generatedType.GetSerializationAdapter());
+		// Check if current type doesn't have any custom serialization logic yet
+		assert(m_generatedType.GetSerializationMethod() == rs::SerializationMethod::Default);
 		m_generatedType.SetSerializationAdapter(std::make_unique<AdapterT>());
 
 		return *this;

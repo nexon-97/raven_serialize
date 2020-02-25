@@ -3,6 +3,7 @@
 #include "rttr/ProxyConverter.hpp"
 #include "rttr/TypeClass.hpp"
 #include "rttr/details/CollectionInserter.hpp"
+#include "rs/SerializationMethod.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -98,6 +99,7 @@ public:
 	const bool RAVEN_SERIALIZE_API IsConst() const;
 	bool RAVEN_SERIALIZE_API IsPolymorphic() const;
 	std::size_t RAVEN_SERIALIZE_API GetHash() const;
+	rs::SerializationMethod RAVEN_SERIALIZE_API GetSerializationMethod() const;
 
 	const bool RAVEN_SERIALIZE_API IsValid() const;
 	RAVEN_SERIALIZE_API operator bool() const;

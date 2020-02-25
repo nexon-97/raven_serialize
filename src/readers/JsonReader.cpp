@@ -535,41 +535,50 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 	}
 	else
 	{
-		rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
-		if (nullptr != proxyTypeData)
+		rs::SerializationMethod serializationMethod = type.GetSerializationMethod();
+
+		switch (serializationMethod)
 		{
-			result = ReadProxy(proxyTypeData, value, jsonVal);
-		}
-		else
-		{
-			// Find custom type resolver for this type
-			SerializationAdapter* adapter = rttr::Manager::GetRTTRManager().GetSerializationAdapter(type);
-			if (nullptr != adapter)
+			case rs::SerializationMethod::Proxy:
 			{
-				// Parse payload
-				SerializationAdapter::DataChunk payload;
-				payload.type = adapter->GetPayloadType();
-
-				if (payload.type.IsValid() && jsonVal.isObject() && jsonVal.isMember(K_ADAPTER))
+				rttr::TypeProxyData* proxyTypeData = rttr::Manager::GetRTTRManager().GetProxyType(type);
+				if (nullptr != proxyTypeData)
 				{
-					// If it's a json object with adapter member, treat it as payload
-					payload.value = m_context->CreateTempVariable(payload.type);
-					ReadResult payloadReadResult = ReadImpl(payload.type, payload.value, jsonVal[K_ADAPTER]);
-				}
-
-				// Perform adapter logic (payload can be empty)
-				SerializationAdapter::AdapterReadOutput adapterOutput = adapter->ReadConvert(payload);
-
-				// Read json value as converted type
-				if (adapterOutput.convertedType.IsValid())
-				{
-					void* adapterValue = m_context->CreateTempVariable(adapterOutput.convertedType);
-					result = ReadImpl(adapterOutput.convertedType, adapterValue, jsonVal);
-
-					adapter->ReadFinalize(adapterValue, value, adapterOutput, payload);
+					result = ReadProxy(proxyTypeData, value, jsonVal);
 				}
 			}
-			else
+			break;
+			case rs::SerializationMethod::Adapter:
+			{
+				SerializationAdapter* adapter = rttr::Manager::GetRTTRManager().GetSerializationAdapter(type);
+				if (nullptr != adapter)
+				{
+					// Parse payload
+					SerializationAdapter::DataChunk payload;
+					payload.type = adapter->GetPayloadType();
+
+					if (payload.type.IsValid() && jsonVal.isObject() && jsonVal.isMember(K_ADAPTER))
+					{
+						// If it's a json object with adapter member, treat it as payload
+						payload.value = m_context->CreateTempVariable(payload.type);
+						ReadResult payloadReadResult = ReadImpl(payload.type, payload.value, jsonVal[K_ADAPTER]);
+					}
+
+					// Perform adapter logic (payload can be empty)
+					SerializationAdapter::AdapterReadOutput adapterOutput = adapter->ReadConvert(payload);
+
+					// Read json value as converted type
+					if (adapterOutput.convertedType.IsValid())
+					{
+						void* adapterValue = m_context->CreateTempVariable(adapterOutput.convertedType);
+						result = ReadImpl(adapterOutput.convertedType, adapterValue, jsonVal);
+
+						adapter->ReadFinalize(adapterValue, value, adapterOutput, payload);
+					}
+				}
+			}
+			break;
+			default:
 			{
 				switch (type.GetTypeClass())
 				{
@@ -632,20 +641,20 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 						{
 							switch (jsonVal.type())
 							{
-								case Json::booleanValue:
-									{
-										*static_cast<bool*>(value) = jsonVal.asBool();
-										result = ReadResult::OKResult();
-									}
-									break;
-								case Json::intValue:
-								case Json::uintValue:
-								case Json::nullValue:
-									{
-										*static_cast<bool*>(value) = !!jsonVal.asUInt64();
-										result = ReadResult::OKResult();
-									}
-									break;
+							case Json::booleanValue:
+							{
+								*static_cast<bool*>(value) = jsonVal.asBool();
+								result = ReadResult::OKResult();
+							}
+							break;
+							case Json::intValue:
+							case Json::uintValue:
+							case Json::nullValue:
+							{
+								*static_cast<bool*>(value) = !!jsonVal.asUInt64();
+								result = ReadResult::OKResult();
+							}
+							break;
 							}
 						}
 						else
@@ -706,7 +715,9 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 					break;
 				}
 			}
+			break;
 		}
+				
 	}
 
 	return result;

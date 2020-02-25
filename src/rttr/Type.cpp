@@ -312,55 +312,6 @@ bool Type::IsSignedIntegral() const
 	return m_typeData->typeParams.scalar->isSigned;
 }
 
-//void Type::IterateArray(const void* value, const ArrayIteratorFunc& f) const
-//{
-//	//assert(IsArray());
-//
-//	if (m_typeData->arrayTraits.isStdArray)
-//	{
-//		std::size_t size = GetDynamicArraySize(value);
-//
-//		auto vectorPtr = reinterpret_cast<const std::vector<int>*>(value);
-//		uintptr_t dataPtr = reinterpret_cast<uintptr_t>(vectorPtr->data());
-//		auto underlyingType = GetUnderlyingType();
-//		const std::size_t itemTypeSize = underlyingType.GetSize();
-//
-//		for (std::size_t i = 0U; i < size; ++i)
-//		{
-//			f(underlyingType, i, reinterpret_cast<void*>(dataPtr));
-//			dataPtr += itemTypeSize;
-//		}
-//	}
-//	else if (m_typeData->arrayTraits.isSimpleArray)
-//	{
-//		auto dataPtr = static_cast<const uint8_t*>(value);
-//		auto underlyingType = GetUnderlyingType();
-//
-//		for (std::size_t i = 0U; i < m_typeData->arrayExtents.get()[0]; ++i)
-//		{
-//			f(underlyingType, i, dataPtr + underlyingType.GetSize() * i);
-//		}
-//	}
-//}
-
-//std::size_t Type::GetDynamicArraySize(const void* value) const
-//{
-//	//assert(IsArray());
-//	return m_typeData->dynamicArrayParams->getSizeFunc(value);
-//}
-//
-//void Type::SetDynamicArraySize(void* value, const std::size_t count) const
-//{
-//	//assert(IsArray());
-//	m_typeData->dynamicArrayParams->resizeFunc(value, count);
-//}
-//
-//void* Type::GetArrayItemValuePtr(void* value, const std::size_t idx) const
-//{
-//	//assert(IsArray());
-//	return m_typeData->dynamicArrayParams->getItemFunc(value, idx);
-//}
-
 void* Type::Instantiate() const
 {
 	return std::invoke(m_typeData->instanceAllocator);
@@ -370,32 +321,6 @@ void Type::Destroy(void* object) const
 {
 	std::invoke(m_typeData->instanceDestructor, object);
 }
-
-//void* Type::GetSmartPtrValue(void* value) const
-//{
-//	assert(IsSmartPointer());
-//
-//	if (m_typeData->smartPtrValueResolver)
-//	{
-//		return m_typeData->smartPtrValueResolver(value);
-//	}
-//	
-//	return nullptr;
-//}
-
-//const char* Type::GetSmartPtrTypeName() const
-//{
-//	assert(IsSmartPointer());
-//	return m_typeData->smartptrParams->smartptrTypeName;
-//}
-//
-//void Type::AssignPointerValue(void* pointer, void* value) const
-//{
-//	if (IsSmartPointer())
-//	{
-//		m_typeData->smartptrParams->valueAssignFunc(pointer, value);
-//	}
-//}
 
 bool Type::operator==(const Type& other) const
 {
@@ -430,6 +355,11 @@ std::size_t Type::GetHash() const
 	}
 
 	return 0U;
+}
+
+rs::SerializationMethod Type::GetSerializationMethod() const
+{
+	return Manager::GetRTTRManager().GetSerializationMethod(Type(m_typeData));
 }
 
 } // namespace rttr

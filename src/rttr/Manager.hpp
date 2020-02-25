@@ -12,6 +12,7 @@
 #include "rttr/StlGenericTypesSpecializers.hpp"
 #include "helper/TypeTraitsExtension.hpp"
 #include "rs/log/Log.hpp"
+#include "rs/SerializationMethod.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -241,6 +242,8 @@ public:
 	void RAVEN_SERIALIZE_API RegisterSerializationAdapter(const Type& type, std::unique_ptr<rs::SerializationAdapter>&& adapter);
 	RAVEN_SERIALIZE_API rs::SerializationAdapter* GetSerializationAdapter(const Type& type);
 
+	rs::SerializationMethod RAVEN_SERIALIZE_API GetSerializationMethod(const Type& type) const;
+
 	static RAVEN_SERIALIZE_API Manager& GetRTTRManager();
 
 private:
@@ -248,6 +251,7 @@ private:
 
 private:
 	std::unordered_map<std::type_index, std::unique_ptr<type_data>> m_types;
+	std::unordered_map<std::size_t, rs::SerializationMethod> m_customSerializationTypes;
 	std::unordered_map<std::string, type_data*> m_typeNames;
 	std::unordered_map<Type, std::unique_ptr<TypeProxyData>> m_proxyTypes;
 	std::unordered_map<Type, std::unique_ptr<rs::SerializationAdapter>> m_serializationAdapters;
