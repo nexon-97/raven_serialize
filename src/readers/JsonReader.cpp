@@ -294,7 +294,7 @@ ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, void* value,
 
 		Log::LogMessage("Reading property '%s::%s'", type.GetName(), propertyName);
 
-		if (jsonVal.isMember(propertyName))
+		if (jsonVal.isObject() && jsonVal.isMember(propertyName))
 		{
 			const Json::Value& itemJsonVal = jsonVal[propertyName];
 
