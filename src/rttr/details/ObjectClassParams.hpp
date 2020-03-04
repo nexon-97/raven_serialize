@@ -3,6 +3,7 @@
 #include "rttr/details/CollectionInserter.hpp"
 #include <vector>
 #include <unordered_map>
+#include <array>
 #include <iterator>
 
 namespace rttr
@@ -58,6 +59,21 @@ struct CollectionTraitsResolver<std::unordered_map<T, U>>
 		params.collectionParams->inserterFactory = std::move(inserterFactory);
 
 		params.collectionParams->itemType = Reflect<std::pair<T, U>>();
+	}
+};
+
+template <typename T, std::size_t Size>
+struct CollectionTraitsResolver<std::array<T, Size>>
+{
+	void operator()(ObjectClassParams& params)
+	{
+		params.collectionParams = std::make_unique<CollectionParams>();
+
+		using InserterT = typename StdArrayInserter<T, Size>;
+		auto inserterFactory = std::make_unique<CollectionInserterFactoryImpl<InserterT>>();
+		params.collectionParams->inserterFactory = std::move(inserterFactory);
+
+		params.collectionParams->itemType = Reflect<T>();
 	}
 };
 
