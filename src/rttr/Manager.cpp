@@ -1,6 +1,11 @@
 #include "rttr/Manager.hpp"
 #include "SerializationContext.hpp"
 
+namespace
+{
+rttr::Manager* g_managerInstance = nullptr;
+}
+
 namespace rttr
 {
 
@@ -8,6 +13,7 @@ void CollectionResizeNoop(void*, const std::size_t) {}
 
 void InitRavenSerialization()
 {
+	Manager::InitRTTR();
 	MetaType<rs::detail::SerializationContext>("@context@");
 }
 
@@ -17,10 +23,23 @@ void AssignPointerValue(void* pointerAddress, void* value)
 	*pointerValue = static_cast<uintptr_t*>(value);
 }
 
+void Manager::InitRTTR()
+{
+	g_managerInstance = new Manager();
+}
+
+void Manager::DestroyRTTR()
+{
+	if (nullptr != g_managerInstance)
+	{
+		delete g_managerInstance;
+		g_managerInstance = nullptr;
+	}
+}
+
 Manager& Manager::GetRTTRManager()
 {
-	static Manager s_manager;	
-	return s_manager;
+	return *g_managerInstance;
 }
 
 Type Manager::GetMetaTypeByName(const char* name)

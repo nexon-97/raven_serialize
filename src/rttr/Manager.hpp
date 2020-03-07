@@ -245,6 +245,8 @@ public:
 	rs::SerializationMethod RAVEN_SERIALIZE_API GetSerializationMethod(const Type& type) const;
 
 	static RAVEN_SERIALIZE_API Manager& GetRTTRManager();
+	static void RAVEN_SERIALIZE_API InitRTTR();
+	static void RAVEN_SERIALIZE_API DestroyRTTR();
 
 private:
 	void RAVEN_SERIALIZE_API AddTypeDataInternal(const std::type_index& typeIndex, std::unique_ptr<type_data>&& typeData);
