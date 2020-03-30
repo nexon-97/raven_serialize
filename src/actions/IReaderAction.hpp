@@ -10,6 +10,8 @@ namespace detail
 class IReaderAction
 {
 public:
+	virtual ~IReaderAction() = default;
+
 	explicit IReaderAction(const std::size_t depth)
 		: m_depth(depth)
 	{}

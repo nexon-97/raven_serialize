@@ -225,6 +225,8 @@ public:
 				enumTraitsResolver(*metaTypeData.typeParams.enum_);
 			}
 			break;
+		default:
+			break;
 		}
 
 		metaTypeData.debugValueViewer = &DebugValueViewerF<T>;

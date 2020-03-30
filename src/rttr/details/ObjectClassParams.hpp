@@ -39,7 +39,7 @@ struct CollectionTraitsResolver<std::vector<T>>
 	{
 		params.collectionParams = std::make_unique<CollectionParams>();
 
-		using InserterT = typename CollectionStdBackInserter<std::vector<T>, T>;
+		using InserterT = CollectionStdBackInserter<std::vector<T>, T>;
 		auto inserterFactory = std::make_unique<CollectionInserterFactoryImpl<InserterT>>();
 		params.collectionParams->inserterFactory = std::move(inserterFactory);
 
@@ -54,7 +54,7 @@ struct CollectionTraitsResolver<std::unordered_map<T, U>>
 	{
 		params.collectionParams = std::make_unique<CollectionParams>();
 
-		using InserterT = typename CollectionStdInserter<std::unordered_map<T, U>, std::pair<T, U>>;
+		using InserterT = CollectionStdInserter<std::unordered_map<T, U>, std::pair<T, U>>;
 		auto inserterFactory = std::make_unique<CollectionInserterFactoryImpl<InserterT>>();
 		params.collectionParams->inserterFactory = std::move(inserterFactory);
 
@@ -69,7 +69,7 @@ struct CollectionTraitsResolver<std::array<T, Size>>
 	{
 		params.collectionParams = std::make_unique<CollectionParams>();
 
-		using InserterT = typename StdArrayInserter<T, Size>;
+		using InserterT = StdArrayInserter<T, Size>;
 		auto inserterFactory = std::make_unique<CollectionInserterFactoryImpl<InserterT>>();
 		params.collectionParams->inserterFactory = std::move(inserterFactory);
 

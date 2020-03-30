@@ -1,6 +1,7 @@
 #pragma once
 #include "rttr/Type.hpp"
 #include "rttr/ProxyConverter.hpp"
+#include "rttr/TypeProxyData.hpp"
 #include "rs/SerializationAdapter.hpp"
 
 namespace rttr
@@ -119,14 +120,6 @@ public:
 		static_assert(std::is_same_v<ExtractClassType<SetterSignature>::type, T>, "Proxy converter must be derived from ProxyConverterBase!");
 
 		std::unique_ptr<Property> propertyInstance = CreateIndirectProperty(name, getter, setter);
-		m_generatedType.AddProperty(std::move(propertyInstance));
-
-		return *this;
-	}
-
-	Type& DeclProperty(const char* name, rs::ICustomPropertyResolvePolicy* policy)
-	{
-		std::unique_ptr<Property> propertyInstance = std::make_unique<rttr::CustomProperty>(name, policy, policy->GetType());
 		m_generatedType.AddProperty(std::move(propertyInstance));
 
 		return *this;

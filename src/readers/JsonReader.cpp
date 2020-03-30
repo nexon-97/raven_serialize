@@ -17,6 +17,7 @@ namespace
 
 struct PredefinedJsonTypeResolver
 {
+	virtual ~PredefinedJsonTypeResolver() = default;
 	virtual void Read(const rttr::Type& type, void* value, const Json::Value& jsonVal) = 0;
 };
 
@@ -655,6 +656,8 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 								result = ReadResult::OKResult();
 							}
 							break;
+							default:
+							break;
 							}
 						}
 						else
@@ -713,6 +716,8 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 						result = ReadArray(type, value, jsonVal);
 					}
 					break;
+					default:
+						break;
 				}
 			}
 			break;

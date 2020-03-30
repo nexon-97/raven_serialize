@@ -6,6 +6,7 @@ namespace rttr
 class ProxyConverterBase
 {
 public:
+	virtual ~ProxyConverterBase() = default;
 	virtual void Convert(void* target, void* source) = 0;
 };
 

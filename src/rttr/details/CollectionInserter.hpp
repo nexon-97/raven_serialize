@@ -6,6 +6,7 @@ namespace rttr
 
 struct CollectionInserterBase
 {
+	virtual ~CollectionInserterBase() = default;
 	virtual void Insert(const void* itemObject) = 0;
 };
 
