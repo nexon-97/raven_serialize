@@ -102,7 +102,7 @@ public:
 	template <typename Signature>
 	TypeInitContext& DeclProperty(const char* name, Signature signature)
 	{
-		static_assert(std::is_same_v<ExtractClassType<Signature>::type, T>, "Member signature class type doesn't match!");
+		static_assert(std::is_same_v<typename ExtractClassType<Signature>::type, T>, "Member signature class type doesn't match!");
 
 		PropertyCreatorFromSignature<Signature> propertyCreator;
 		std::unique_ptr<Property> propertyInstance = propertyCreator(name, signature);
@@ -116,8 +116,8 @@ public:
 	{
 		static_assert(IsMemberFuncPrototype<GetterSignature>::value, "GetterSignature must be member function prototype");
 		static_assert(IsMemberFuncPrototype<SetterSignature>::value, "SetterSignature must be member function prototype");
-		static_assert(std::is_same_v<ExtractClassType<GetterSignature>::type, T>, "Member function prototype doesn't match type!");
-		static_assert(std::is_same_v<ExtractClassType<SetterSignature>::type, T>, "Proxy converter must be derived from ProxyConverterBase!");
+		static_assert(std::is_same_v<typename ExtractClassType<GetterSignature>::type, T>, "Member function prototype doesn't match type!");
+		static_assert(std::is_same_v<typename ExtractClassType<SetterSignature>::type, T>, "Proxy converter must be derived from ProxyConverterBase!");
 
 		std::unique_ptr<Property> propertyInstance = CreateIndirectProperty(name, getter, setter);
 		m_generatedType.AddProperty(std::move(propertyInstance));

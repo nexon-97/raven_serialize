@@ -216,7 +216,10 @@ struct ExtractValueType<AccessorMethodNonConst<T, ValueType>>
 ///////////////////////////////////////////////////////////////////////////////////////
 
 template <typename SignatureType>
-struct ExtractClassType {};
+struct ExtractClassType
+{
+	typedef std::nullptr_t type;
+};
 
 template <typename T, typename ValueType>
 struct ExtractClassType<MemberSignature<T, ValueType>>
