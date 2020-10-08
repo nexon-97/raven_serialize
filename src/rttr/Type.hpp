@@ -3,6 +3,7 @@
 #include "rttr/ProxyConverter.hpp"
 #include "rttr/TypeClass.hpp"
 #include "rttr/details/CollectionInserter.hpp"
+#include "rttr/details/CollectionIterator.hpp"
 #include "rs/SerializationMethod.hpp"
 
 #include <unordered_map>
@@ -115,6 +116,7 @@ public:
 	void RAVEN_SERIALIZE_API AddProperty(std::unique_ptr<Property>&& property);
 	bool RAVEN_SERIALIZE_API IsCollection() const;
 	std::unique_ptr<CollectionInserterBase> RAVEN_SERIALIZE_API CreateCollectionInserter(void* collection) const;
+	std::unique_ptr<CollectionIteratorBase> RAVEN_SERIALIZE_API CreateCollectionIterator(void* collection) const;
 	Type RAVEN_SERIALIZE_API GetCollectionItemType() const;
 
 	// Proxy logic

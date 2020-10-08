@@ -221,8 +221,12 @@ void Type::AddProperty(std::unique_ptr<Property>&& property)
 
 bool Type::IsCollection() const
 {
-	assert(m_typeData->typeClass == TypeClass::Object);
-	return !!m_typeData->typeParams.object->collectionParams;
+	if (m_typeData->typeClass == TypeClass::Object)
+	{
+		return !!m_typeData->typeParams.object->collectionParams;
+	}
+
+	return false;
 }
 
 std::unique_ptr<CollectionInserterBase> Type::CreateCollectionInserter(void* collection) const
@@ -239,6 +243,22 @@ std::unique_ptr<CollectionInserterBase> Type::CreateCollectionInserter(void* col
 	}
 
 	return std::unique_ptr<CollectionInserterBase>();
+}
+
+std::unique_ptr<CollectionIteratorBase> Type::CreateCollectionIterator(void* collection) const
+{
+	assert(m_typeData->typeClass == TypeClass::Object);
+
+	if (m_typeData->typeParams.object->collectionParams)
+	{
+		CollectionIteratorFactory* iteratorFactory = m_typeData->typeParams.object->collectionParams->iteratorFactory.get();
+		if (iteratorFactory)
+		{
+			return iteratorFactory->CreateIterator(collection);
+		}
+	}
+
+	return std::unique_ptr<CollectionIteratorBase>();
 }
 
 Type Type::GetCollectionItemType() const

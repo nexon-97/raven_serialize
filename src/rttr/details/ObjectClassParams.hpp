@@ -1,6 +1,7 @@
 #pragma once
 #include "rttr/Property.hpp"
 #include "rttr/details/CollectionInserter.hpp"
+#include "rttr/details/CollectionIterator.hpp"
 #include <vector>
 #include <unordered_map>
 #include <array>
@@ -14,6 +15,7 @@ namespace rttr
 struct CollectionParams
 {
 	std::unique_ptr<CollectionInserterFactory> inserterFactory;
+	std::unique_ptr<CollectionIteratorFactory> iteratorFactory;
 	Type itemType;
 };
 
@@ -42,6 +44,9 @@ struct CollectionTraitsResolver<std::vector<T>>
 		using InserterT = CollectionStdBackInserter<std::vector<T>, T>;
 		auto inserterFactory = std::make_unique<CollectionInserterFactoryImpl<InserterT>>();
 		params.collectionParams->inserterFactory = std::move(inserterFactory);
+
+		auto iteratorFactory = std::make_unique<CollectionIteratorFactoryImpl<std::vector<T>>>();
+		params.collectionParams->iteratorFactory = std::move(iteratorFactory);
 
 		params.collectionParams->itemType = Reflect<T>();
 	}
