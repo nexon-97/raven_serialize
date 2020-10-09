@@ -12,13 +12,13 @@ class CollectionInsertAction
 	: public IReaderAction
 {
 public:
-	explicit CollectionInsertAction(const std::size_t depth, rttr::CollectionInserterBase* inserter, const void* value);
+	explicit CollectionInsertAction(const std::size_t depth, std::unique_ptr<rttr::CollectionInserterBase>&& inserter, const void* value);
 
 	void Perform() final;
 	const ReaderActionType GetActionType() const final;
 
 private:
-	rttr::CollectionInserterBase* m_inserter;
+	std::unique_ptr<rttr::CollectionInserterBase> m_inserter;
 	const void* m_value;
 };
 

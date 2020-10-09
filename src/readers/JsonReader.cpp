@@ -94,8 +94,13 @@ JsonReader::JsonReader(std::istream& stream)
 		std::string errorStr;
 
 		m_isOk = reader->parse(buffer, buffer + bufferSize, &m_jsonRoot, &errorStr);
+		if (!m_isOk)
+		{
+			Log::LogMessage(errorStr);
+		}
 
 		delete[] buffer;
+		delete reader;
 	}
 	else
 	{
@@ -109,21 +114,24 @@ JsonReader::JsonReader(std::istream& stream)
 	}
 }
 
-void JsonReader::SortActions()
-{
-	using ActionPtr = std::unique_ptr<detail::IReaderAction>;
-	auto predicate = [](const ActionPtr& lhs, const ActionPtr& rhs)
-	{
-		// First sort by action types
-		if (lhs->GetActionType() != rhs->GetActionType())
-		{
-			return static_cast<int>(lhs->GetActionType()) < static_cast<int>(rhs->GetActionType());
-		}
+JsonReader::JsonReader(Json::Value&& jsonVal)
+	: m_jsonRoot(std::move(jsonVal))
+	, m_isOk(true)
+{}
 
-		// Then, if the same class, go the deeper operations
-		return lhs->GetDepth() > rhs->GetDepth();
-	};
-	std::stable_sort(m_deferredCommandsList.begin(), m_deferredCommandsList.end(), predicate);
+JsonReader::JsonReader(const std::string& jsonContent)
+{
+	Json::CharReaderBuilder builder;
+	Json::CharReader* reader = builder.newCharReader();
+	std::string errorStr;
+
+	m_isOk = reader->parse(jsonContent.c_str(), jsonContent.c_str() + jsonContent.size(), &m_jsonRoot, &errorStr);
+	if (!m_isOk)
+	{
+		Log::LogMessage(errorStr);
+	}
+
+	delete reader;
 }
 
 Json::Value const* JsonReader::FindContextJsonObject(const Json::Value& jsonRoot, const uint64_t id) const
@@ -312,12 +320,15 @@ ReadResult JsonReader::ReadObjectProperties(const rttr::Type& type, void* value,
 				propertyValuePtr = property->GetValueAddress(value);
 			}
 
+			// Read value
 			ReadResult propertyReadResult = ReadImpl(propertyType, propertyValuePtr, itemJsonVal);
 
 			if (propertyReadResult.Succeeded())
 			{
+				// We have succeeded, now call property mutator function to apply temp
 				property->CallMutator(value, const_cast<void*>(propertyValuePtr));
 
+				// As we already applied value to target, we can release temp variable
 				if (needsTempVar)
 				{
 					m_context->DestroyTempVariable(propertyValuePtr);
@@ -372,9 +383,6 @@ ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const
 
 		if (inserter && collectionItemType.IsValid())
 		{
-			rttr::CollectionInserterBase* rawInserter = inserter.get();
-			m_collectionInserters.push_back(std::move(inserter));
-
 			// If we reach here, we have a valid collection
 			result.success = true;
 
@@ -389,7 +397,7 @@ ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const
 				if (itemReadResult.Succeeded())
 				{
 					// Item read successfully, so we can safely insert here and release item temp variable
-					rawInserter->Insert(collectionItem);
+					inserter->Insert(collectionItem);
 					m_context->DestroyTempVariable(collectionItem);
 				}
 				else
@@ -402,7 +410,7 @@ ReadResult JsonReader::ReadCollection(const rttr::Type& type, void* value, const
 						result.allEntitiesResolved = false;
 
 						// Not all entities of collection item are resolved, put insert command to deferred commands list
-						auto insertAction = std::make_unique<detail::CollectionInsertAction>(0, rawInserter, collectionItem);
+						auto insertAction = std::make_unique<detail::CollectionInsertAction>(0, std::move(inserter), collectionItem);
 						m_deferredCommandsList.push_back(std::move(insertAction));
 					}
 					
@@ -590,10 +598,15 @@ ReadResult JsonReader::ReadImpl(const rttr::Type& type, void* value, const Json:
 						ReadResult basesReadResult = ReadObjectBases(type, value, jsonVal);
 						result.Merge(basesReadResult);
 
-						std::size_t propertiesCount = type.GetPropertiesCount();
-						ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
-						result.Merge(propertiesReadResult);
-
+						// Read object properties if any
+						const std::size_t propertiesCount = type.GetPropertiesCount();
+						if (propertiesCount > 0U)
+						{
+							ReadResult propertiesReadResult = ReadObjectProperties(type, value, jsonVal, propertiesCount);
+							result.Merge(propertiesReadResult);
+						}
+						
+						// Read collection items if this type is a collection
 						if (type.IsCollection())
 						{
 							ReadResult collectionReadResult = ReadCollection(type, value, jsonVal, propertiesCount);

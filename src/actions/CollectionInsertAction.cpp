@@ -6,10 +6,10 @@ namespace rs
 namespace detail
 {
 
-CollectionInsertAction::CollectionInsertAction(const std::size_t depth, rttr::CollectionInserterBase* inserter, const void* value)
+CollectionInsertAction::CollectionInsertAction(const std::size_t depth, std::unique_ptr<rttr::CollectionInserterBase>&& inserter, const void* value)
 	: IReaderAction(depth)
 	, m_value(value)
-	, m_inserter(inserter)
+	, m_inserter(std::move(inserter))
 {}
 
 void CollectionInsertAction::Perform()

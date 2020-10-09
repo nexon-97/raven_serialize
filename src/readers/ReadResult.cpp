@@ -21,15 +21,8 @@ bool ReadResult::Succeeded() const
 
 void ReadResult::Merge(const ReadResult& other)
 {
-	if (other.success != success)
-	{
-		success = false;
-	}
-
-	if (other.allEntitiesResolved != allEntitiesResolved)
-	{
-		allEntitiesResolved = false;
-	}
+	success &= other.success;
+	allEntitiesResolved &= other.allEntitiesResolved;
 }
 
 const ReadResult& ReadResult::OKResult()

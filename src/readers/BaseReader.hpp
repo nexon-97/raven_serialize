@@ -18,11 +18,20 @@ namespace rttr
 namespace rs
 {
 
+/*
+* @brief BaseReader implements basic infrastructure needed to read all supported types of data
+*/
 class BaseReader
 	: public IReader
 {
 public:
 	void RAVEN_SERIALIZE_API Read(const rttr::Type& type, void* value) final;
+
+	template <typename T>
+	void Read(T& value)
+	{
+		Read(rttr::Reflect<T>(), &value);
+	}
 
 protected:
 	// Removes data about objects that had already been loaded
@@ -32,10 +41,12 @@ protected:
 	virtual bool CheckSourceHasObjectsList() = 0;
 
 protected:
+	// Context is used to store the temp variables and objects ids mappings
 	std::unique_ptr<rs::detail::SerializationContext> m_context;
 	std::vector<std::pair<uint64_t, rttr::Type>> m_referencedContextObjects;
+	// Deferred commands list is used to handle complex nested cases, when we read some deep property, up the tree there might be temp variables,
+	// and indirect properties, so to make sure everything will be in place, we remember operations, and after we execute them to get final result
 	std::vector<std::unique_ptr<detail::IReaderAction>> m_deferredCommandsList;
-	std::vector<std::unique_ptr<rttr::CollectionInserterBase>> m_collectionInserters;
 	bool m_hasObjectsList = false;
 };
 
