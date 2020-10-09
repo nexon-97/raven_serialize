@@ -22,7 +22,7 @@ class SerializationContext
 {
 public:
 	SerializationContext() = default; 
-	~SerializationContext();
+	RAVEN_SERIALIZE_API ~SerializationContext();
 
 	struct ObjectData
 	{

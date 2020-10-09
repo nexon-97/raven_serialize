@@ -4,6 +4,12 @@
 
 #include <unordered_map>
 
+namespace rttr
+{
+template <typename T>
+Type Reflect();
+}
+
 namespace rs
 {
 
@@ -16,6 +22,12 @@ public:
 	virtual void Read(const rttr::Type& type, void* value) = 0;
 	// Notifies if the reader object is ready to perform reading
 	virtual bool IsOk() const = 0;
+
+	template <typename T>
+	void TypedRead(T& value)
+	{
+		Read(rttr::Reflect<T>(), &value);
+	}
 
 protected:
 	// Actually reads data, assuming reading context is valid

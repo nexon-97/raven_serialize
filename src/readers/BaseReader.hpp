@@ -9,12 +9,6 @@
 #include <unordered_map>
 #include <json/json.h>
 
-namespace rttr
-{
-	template <typename T>
-	Type Reflect();
-}
-
 namespace rs
 {
 
@@ -26,12 +20,6 @@ class BaseReader
 {
 public:
 	void RAVEN_SERIALIZE_API Read(const rttr::Type& type, void* value) final;
-
-	template <typename T>
-	void Read(T& value)
-	{
-		Read(rttr::Reflect<T>(), &value);
-	}
 
 protected:
 	// Removes data about objects that had already been loaded
