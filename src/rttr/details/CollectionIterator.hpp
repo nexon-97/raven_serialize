@@ -54,7 +54,7 @@ public:
 	std::unique_ptr<CollectionIteratorBase> CreateIterator(void* collection) override
 	{
 		CollectionT* typedCollection = static_cast<CollectionT*>(collection);
-		return std::make_unique<CollectionIteratorImpl<CollectionT::iterator>>(typedCollection->begin(), typedCollection->end());
+		return std::make_unique<CollectionIteratorImpl<typename CollectionT::iterator>>(typedCollection->begin(), typedCollection->end());
 	}
 };
 
