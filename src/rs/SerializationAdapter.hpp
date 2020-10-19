@@ -32,7 +32,9 @@ public:
 	// Reader call read finalize after AdapterReadOutput struct has been processed, value contains data read from source, target is pointer to final data
 	virtual void ReadFinalize(void* value, void* target, const AdapterReadOutput& output, const DataChunk& payload) = 0;
 	// For write, we generate data chunk and payload
-	virtual AdapterWriteOutput Write() = 0;
+	virtual AdapterWriteOutput Write(const void* value) = 0;
+	// Finalize when we no longer need this adapter, and can clean up some temp state
+	virtual void WriteFinalize(const void* value) {}
 	// Returns adapter payload type
 	virtual rttr::Type GetPayloadType() const = 0;
 };

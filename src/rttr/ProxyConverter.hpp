@@ -7,7 +7,7 @@ class ProxyConverterBase
 {
 public:
 	virtual ~ProxyConverterBase() = default;
-	virtual void Convert(void* target, void* source) = 0;
+	virtual void Convert(void* target, const void* source) = 0;
 };
 
 template <typename T, typename U>
@@ -17,11 +17,11 @@ class ConstructorProxyConverter
 	using RawU = typename std::remove_reference_t<U>;
 
 public:
-	void Convert(void* target, void* source) override
+	void Convert(void* target, const void* source) override
 	{
-		RawU* typedProxy = static_cast<RawU*>(source);
+		const RawU* typedProxy = static_cast<const RawU*>(source);
 		T* typedTarget = static_cast<T*>(target);
-		*typedTarget = T(std::forward<RawU>(*typedProxy));
+		*typedTarget = T(*typedProxy);
 	}
 };
 
@@ -39,9 +39,9 @@ public:
 		: m_memFunPtr(memFunPtr)
 	{}
 
-	void Convert(void* target, void* source) override
+	void Convert(void* target, const void* source) override
 	{
-		T* typedSource = static_cast<T*>(source);
+		const T* typedSource = static_cast<const T*>(source);
 		RawU* typedTargetPtr = static_cast<RawU*>(target);
 		*typedTargetPtr = std::invoke(m_memFunPtr, typedSource);
 	}
