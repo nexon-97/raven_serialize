@@ -1,3 +1,4 @@
+#include "raven_serialize_export.h"
 #include "rs/log/Log.hpp"
 
 #include <memory>

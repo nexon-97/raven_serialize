@@ -1,4 +1,5 @@
 #pragma once
+#include "raven_serialize_export.h"
 #include "helper/TypeTraitsExtension.hpp"
 #include "rttr/ProxyConverter.hpp"
 #include "rttr/TypeClass.hpp"
